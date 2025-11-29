@@ -71,6 +71,17 @@ static void print_tree(AstNode *node) {
 			}
             printf(")");
             break;
+        case AST_WHILE:
+            printf("(while ");
+			print_tree(node->left);
+			List *statements = &node->as.block.statements;
+			AstNode *statement;
+			for (int i = 0; i < statements->length; i++) {
+				statement = LIST_GET(AstNode *, statements, i);
+				print_tree(statement);
+			}
+            printf(")");
+            break;
     }
 }
 
@@ -217,6 +228,26 @@ static AstNode *parse_expression_statement() {
     return expression;
 }
 
+static AstNode *parse_while_statement() {
+	if (current_token->type == TOKEN_WHILE) {
+		AstNode *while_node = create_node(AST_WHILE);
+		current_token++;
+
+		AstNode *expr = parse_expression();
+		while_node->left = expr;
+
+		consume(TOKEN_LEFT_BRACE);
+		list_init(&while_node->as.block.statements, sizeof(AstNode *));
+		while (current_token->type != TOKEN_RIGHT_BRACE && (current_token - (Token *)tokens->elements) < tokens->length) {
+			AstNode *statement = parse_statement();
+			list_add(&while_node->as.block.statements, &statement);
+		}
+		consume(TOKEN_RIGHT_BRACE);
+		return while_node;
+	}
+	return parse_expression_statement();
+}
+
 static AstNode *parse_function() {
 	if (current_token->type == TOKEN_FUN) {
 		AstNode *fn_node = create_node(AST_FUNCTION);
@@ -299,7 +330,7 @@ static AstNode *parse_function() {
 
 		return fn_node;
 	}
-	return parse_expression_statement();
+	return parse_while_statement();
 }
 
 static AstNode *parse_statement() {

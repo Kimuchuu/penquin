@@ -28,6 +28,7 @@ enum TokenType {
     TOKEN_EOF,
 
     TOKEN_FUN,
+    TOKEN_WHILE,
 };
 
 typedef struct {

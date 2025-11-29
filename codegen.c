@@ -19,7 +19,7 @@
 static LLVMContextRef context;
 static LLVMBuilderRef builder;
 static LLVMModuleRef module;
-
+static LLVMValueRef *current_function;
 Table *locals;
 Table globals;
 Table types;
@@ -99,7 +99,16 @@ static LLVMValueRef parse_assignment(AstNode *node) {
 
 	MALLOC_CSTRING(name, node->left->as.string)
 
-	LLVMValueRef pointer = LLVMBuildAlloca(builder, LLVMTypeOf(value_node), name);
+	LLVMValueRef pointer = NULL;
+	if (locals != NULL) {
+		pointer = (LLVMValueRef)table_get(locals, name);
+	}
+	if (pointer == NULL) {
+		pointer = (LLVMValueRef)table_get(&globals, name);
+	}
+	if (pointer == NULL) {
+		pointer = LLVMBuildAlloca(builder, LLVMTypeOf(value_node), name);
+	}
 	LLVMBuildStore(builder, value_node, pointer);
 	if (locals != NULL && table_get(locals, name) != NULL || table_get(&globals, name) == NULL) {
 		table_put(locals, name, pointer);
@@ -160,6 +169,7 @@ static LLVMValueRef parse_function(AstNode *node) {
 		0
 	);
     LLVMValueRef fn = LLVMAddFunction(module, name, fn_type);
+	current_function = &fn;
 	table_put(&globals, name, fn);
 
 	if (node->as.fn.statements.elements != NULL) {
@@ -189,6 +199,29 @@ static LLVMValueRef parse_function(AstNode *node) {
 	return fn;
 }
 
+static LLVMValueRef parse_while(AstNode *node) {
+	LLVMBasicBlockRef start_block = LLVMAppendBasicBlockInContext(context, *current_function, "");
+	LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(context, *current_function, "");
+	LLVMBasicBlockRef end_block = LLVMAppendBasicBlockInContext(context, *current_function, "");
+
+	LLVMBuildBr(builder, start_block);
+	LLVMPositionBuilderAtEnd(builder, start_block);
+	LLVMValueRef expr = parse_node(node->left);
+	LLVMValueRef null = LLVMConstNull(LLVMTypeOf(expr));
+	LLVMValueRef cond = LLVMBuildICmp(builder, LLVMIntNE, expr, null, "");
+	LLVMBuildCondBr(builder, cond, body_block, end_block);
+
+	LLVMPositionBuilderAtEnd(builder, body_block);
+	for (int i = 0; i < node->as.block.statements.length; i++) {
+		AstNode *stmnt = LIST_GET(AstNode *, &node->as.block.statements, i);
+		parse_node(stmnt);
+	}
+
+	LLVMBuildBr(builder, start_block);
+	LLVMPositionBuilderAtEnd(builder, end_block);
+	return NULL;
+}
+
 static LLVMValueRef parse_node(AstNode *node) {
 	switch (node->type) {
 		case AST_OPERATOR:
@@ -205,6 +238,8 @@ static LLVMValueRef parse_node(AstNode *node) {
 			return parse_function_call(node);
 		case AST_FUNCTION:
 			return parse_function(node);
+		case AST_WHILE:
+			return parse_while(node);
 		default:
 			report_invalid_node("Unhandled node types");
     }

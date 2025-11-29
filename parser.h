@@ -16,11 +16,16 @@ typedef struct {
 	List statements;
 } Function;
 
+typedef struct {
+	List statements;
+} Block;
+
 typedef enum {
     AST_NUMBER,
     AST_STRING,
     AST_VARIABLE,
     AST_FUNCTION,
+    AST_WHILE,
 
     AST_OPERATOR,
     AST_ASSIGNMENT,
@@ -35,6 +40,7 @@ typedef struct AstNode {
         char operator;
         String string;
 		List arguments;
+		Block block;
 		Function fn;
     } as;
     struct AstNode *left;

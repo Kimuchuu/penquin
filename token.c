@@ -42,6 +42,7 @@ const char *token_type_to_string(enum TokenType type) {
         CASE_TOKEN(STRING);
         CASE_TOKEN(IDENTIFIER);
     	CASE_TOKEN(FUN);
+    	CASE_TOKEN(WHILE);
 
         CASE_TOKEN(ERROR);
         CASE_TOKEN(EOF);
@@ -161,6 +162,8 @@ static void scan_token() {
 				int len = scanner.current - start;
 				if (len == 3 && strncmp(token.raw, "fun", 3) == 0) {
 					token.type = TOKEN_FUN;
+				} else if (len == 5 && strncmp(token.raw, "while", 5) == 0) {
+					token.type = TOKEN_WHILE;
 				} else {
 					token.type = TOKEN_IDENTIFIER;
 				}
