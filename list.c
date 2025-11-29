@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include "list.h"
 #include "string.h"
@@ -17,10 +18,15 @@ List *list_init(List *list, size_t element_size) {
 
 void list_add(List *list, void *ref) {
     if (list->capacity < list->length + 1) {
-        int new_capacity = list->capacity * 2; // TODO: Overflow?
+        int new_capacity = list->capacity * 2;
+		if (new_capacity < list->capacity) {
+			fprintf(stderr, "List too long. Capacity overflowed.");
+			exit(1);
+		}
         void *new_elements = realloc(list->elements, new_capacity * list->element_size);
         if (new_elements == NULL) {
-            // TODO: Handle error
+			fprintf(stderr, "Unable to reallocate list.");
+			exit(1);
         }
         list->elements = new_elements;
         list->capacity = new_capacity;
