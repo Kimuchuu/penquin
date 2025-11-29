@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -196,7 +197,7 @@ static AstNode *parse_term() {
 static AstNode *parse_assignment() {
     AstNode *dst = parse_term();
     if (current_token->type == TOKEN_EQUAL) {
-        // TODO: validate correct left.
+        assert(dst->type == AST_VARIABLE);
         AstNode *ass = create_node(AST_ASSIGNMENT);
         current_token++;
         ass->left = dst;
