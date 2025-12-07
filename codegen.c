@@ -17,13 +17,18 @@
 									 memcpy(name, string.p, string.length);\
 								  	 name[string.length] = '\0';
 
+typedef struct Scope {
+	struct Scope *prev;
+	Table *locals;
+} Scope;
+
 static LLVMContextRef context;
 static LLVMBuilderRef builder;
 static LLVMModuleRef module;
 static LLVMValueRef *current_function;
-Table *locals;
-Table globals;
 Table types;
+Scope *current_scope;
+Scope *global_scope;
 
 static LLVMValueRef parse_node(AstNode *node);
 
@@ -87,11 +92,10 @@ static LLVMValueRef parse_variable(AstNode *node) {
 	DEFINE_CSTRING(name, node->as.string)
 
 	LLVMValueRef value_pointer = NULL;
-	if (locals != NULL) {
-		value_pointer = (LLVMValueRef)table_get(locals, name);
-	}
-	if (value_pointer == NULL) {
-		value_pointer = (LLVMValueRef)table_get(&globals, name);
+	Scope *scope = current_scope;
+	while (scope != NULL && value_pointer == NULL) {
+		value_pointer = (LLVMValueRef)table_get(scope->locals, name);
+		scope = scope->prev;
 	}
 	return LLVMBuildLoad2(
 		builder,
@@ -111,21 +115,20 @@ static LLVMValueRef parse_assignment(AstNode *node) {
 	MALLOC_CSTRING(name, node->left->as.string)
 
 	LLVMValueRef pointer = NULL;
-	if (locals != NULL) {
-		pointer = (LLVMValueRef)table_get(locals, name);
-	}
-	if (pointer == NULL) {
-		pointer = (LLVMValueRef)table_get(&globals, name);
+	Scope *using_scope = NULL;
+	Scope *check_scope = current_scope;
+	while (check_scope != NULL && pointer == NULL) {
+		pointer = (LLVMValueRef)table_get(check_scope->locals, name);
+		check_scope = check_scope->prev;
+		using_scope = check_scope;
 	}
 	if (pointer == NULL) {
 		pointer = LLVMBuildAlloca(builder, LLVMTypeOf(value_node), name);
+		table_put(current_scope->locals, name, pointer);
+	} else {
+		table_put(using_scope->locals, name, pointer);
 	}
 	LLVMBuildStore(builder, value_node, pointer);
-	if ((locals != NULL && table_get(locals, name) != NULL) || table_get(&globals, name) == NULL) {
-		table_put(locals, name, pointer);
-	} else {
-		table_put(&globals, name, pointer);
-	}
 
 	return value_node;
 }
@@ -133,7 +136,7 @@ static LLVMValueRef parse_assignment(AstNode *node) {
 static LLVMValueRef parse_function_call(AstNode *node) {
 	DEFINE_CSTRING(name, node->left->as.string)
 
-	LLVMValueRef fn = table_get(&globals, name);
+	LLVMValueRef fn = table_get(global_scope->locals, name);
 	LLVMTypeRef fn_type = LLVMGlobalGetValueType(fn);
 
 	LLVMValueRef args[node->as.arguments.length];
@@ -155,10 +158,10 @@ static LLVMValueRef parse_function(AstNode *node) {
 		return_type = table_get(&types, return_name);
 	}
 
-	Table *tmp_locals = locals;
-	Table fn_locals;
-	locals = &fn_locals;
-    table_init(locals);
+	Table locals;
+    table_init(&locals);
+	Scope function_scope = { .prev = current_scope, .locals = &locals };
+	current_scope = &function_scope;
 
 	LLVMTypeRef *parameters = NULL;
 	if (node->as.fn.parameters.length != 0) {
@@ -181,7 +184,7 @@ static LLVMValueRef parse_function(AstNode *node) {
 	);
     LLVMValueRef fn = LLVMAddFunction(module, name, fn_type);
 	current_function = &fn;
-	table_put(&globals, name, fn);
+	table_put(global_scope->locals, name, fn);
 
 	if (node->as.fn.statements.elements != NULL) {
 		LLVMBasicBlockRef block = LLVMAppendBasicBlockInContext(context, fn, "");
@@ -194,7 +197,7 @@ static LLVMValueRef parse_function(AstNode *node) {
 			LLVMValueRef param_value = LLVMGetParam(fn, i);
 			LLVMValueRef param_pointer = LLVMBuildAlloca(builder, LLVMTypeOf(param_value), name);
 			LLVMBuildStore(builder, param_value, param_pointer);
-			table_put(locals, param_name, param_pointer);
+			table_put(&locals, param_name, param_pointer);
 		}
 		
 
@@ -206,7 +209,7 @@ static LLVMValueRef parse_function(AstNode *node) {
 		LLVMPositionBuilderAtEnd(builder, block);
 	}
 
-	locals = tmp_locals;
+	current_scope = function_scope.prev;
 	return fn;
 }
 
@@ -260,10 +263,15 @@ static LLVMValueRef parse_if(AstNode *node) {
 }
 
 static LLVMValueRef parse_block(AstNode *node) {
+	Table locals;
+    table_init(&locals);
+	Scope block_scope = { .prev = current_scope, .locals = &locals };
+	current_scope = &block_scope;
 	for (int i = 0; i < node->as.block.statements.length; i++) {
 		AstNode *stmnt = LIST_GET(AstNode *, &node->as.block.statements, i);
 		parse_node(stmnt);
 	}
+	current_scope = block_scope.prev;
 	return NULL;
 }
 
@@ -307,6 +315,9 @@ void compile(List *nodes) {
     builder = LLVMCreateBuilderInContext(context);
     module = LLVMModuleCreateWithNameInContext("toast", context);
 
+	Table globals;
+	Scope scope = { .prev = current_scope, .locals = &globals };
+	global_scope = current_scope = &scope;
     table_init(&globals);
     table_init(&types);
 
