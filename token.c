@@ -30,6 +30,7 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(EOF);
         CASE_TOKEN(EQUAL);
         CASE_TOKEN(ERROR);
+        CASE_TOKEN(EXTERN);
     	CASE_TOKEN(FUN);
         CASE_TOKEN(GREATER_THAN);
         CASE_TOKEN(GREATER_THAN_OR_EQUAL);
@@ -121,6 +122,8 @@ static void scan_token() {
 			token.type = TOKEN_ELSE;
 		} else if (len == 5 && strncmp(token.raw, "while", 5) == 0) {
 			token.type = TOKEN_WHILE;
+		} else if (len == 6 && strncmp(token.raw, "extern", 6) == 0) {
+			token.type = TOKEN_EXTERN;
 		} else if (len == 6 && strncmp(token.raw, "import", 6) == 0) {
 			token.type = TOKEN_IMPORT;
 		} else if (len == 6 && strncmp(token.raw, "return", 6) == 0) {

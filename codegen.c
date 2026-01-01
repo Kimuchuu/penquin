@@ -30,7 +30,6 @@ Scope *current_scope;
 Scope global_scope;
 char *module_dir;
 char *module_path;
-bool module_is_entry;
 
 char *resolve_module_path(char *dir, String module_name) {
 	int dirlen = strlen(dir);
@@ -52,22 +51,32 @@ static char *resolve_identifier_name(char *path, String name) {
 	return cstring_concat_String(prefix, name);
 }
 
-static char *resolve_identifier(String name) {
-	if (module_is_entry) {
+static char *resolve_identifier(String name, bool external) {
+	if (external || String_cmp(name, "main") == 0) {
 		return String_to_cstring(name);
 	} else {
 		return resolve_identifier_name(module_path, name);
 	}
 }
 
-static LLVMValueRef lookup_identifier(char *resolved_name) {
+static LLVMValueRef lookup_identifier(String name) {
+	char *global_name = resolve_identifier(name, false);
+	DEFINE_CSTRING(local_name, name)
+
 	LLVMValueRef value_pointer = NULL;
 	Scope *scope = current_scope;
 	while (scope != NULL && value_pointer == NULL) {
-		value_pointer = (LLVMValueRef)table_get(scope->locals, resolved_name);
+		char *lookup_name = scope->locals == global_scope.locals ? global_name : local_name;
+		value_pointer = (LLVMValueRef)table_get(scope->locals, lookup_name);
 		scope = scope->prev;
 	}
 
+	if (value_pointer == NULL) {
+		// External declarations, could be moved to separate private place
+		value_pointer = (LLVMValueRef)table_get(global_scope.locals, local_name);
+	}
+
+	free(global_name);
 	return value_pointer;
 }
 
@@ -138,24 +147,18 @@ static LLVMValueRef parse_operator(AstNode *node) {
 }
 
 static LLVMValueRef parse_variable(AstNode *node) {
-	char *resolved_name = resolve_identifier(node->as.string);
-	LLVMValueRef value_pointer = lookup_identifier(resolved_name);
-	free(resolved_name);
-	return value_pointer;
+	return lookup_identifier(node->as.string);
 }
 
 static LLVMValueRef parse_assignment(AstNode *node) {
-	char *name = resolve_identifier(node->as.assignment.name);
-	LLVMValueRef pointer = lookup_identifier(name);
+	LLVMValueRef pointer = lookup_identifier(node->as.assignment.name);
 	LLVMValueRef value_node = handle_rvalue(parse_node(node->as.assignment.value));
 
 	if (pointer == NULL) {
+		char *name = resolve_identifier(node->as.assignment.name, current_scope->locals != global_scope.locals);
 		pointer = LLVMBuildAlloca(builder, LLVMTypeOf(value_node), name);
 		table_put(current_scope->locals, name, pointer);
-	} else {
-		free(name);
 	}
-
 	LLVMBuildStore(builder, value_node, pointer);
 
 	return value_node;
@@ -210,7 +213,7 @@ static LLVMValueRef parse_function_definition(char *name, AstNode *node) {
 }
 
 static LLVMValueRef parse_function(AstNode *node) {
-	char *name = resolve_identifier(node->as.fn.name);
+	char *name = resolve_identifier(node->as.fn.name, node->as.fn.external);
 
 	Table locals;
     table_init(&locals);
@@ -325,7 +328,7 @@ static LLVMValueRef parse_import(AstNode *node) {
 	List *import_file_nodes = &file_node->as.file.nodes;
 	for (int i = 0; i < import_file_nodes->length; i++) {
 		AstNode *i_node = LIST_GET(AstNode *, import_file_nodes, i);
-		if (i_node->type == AST_FUNCTION) {
+		if (i_node->type == AST_FUNCTION && !i_node->as.fn.external) {
 			char *i_name = resolve_identifier_name(import_path, i_node->as.fn.name);
 			parse_function_definition(i_name, i_node);
 		}
@@ -338,13 +341,10 @@ static LLVMValueRef parse_accessor(AstNode *node) {
 	File *file = table_get(imports, import_path);
 
 	char *current_module_path = module_path;
-	bool current_module_is_entry = module_is_entry;
 
-	module_is_entry = false;
 	module_path = file->path;
 	LLVMValueRef result = parse_node(node->as.accessor.right);
 
-	module_is_entry = current_module_is_entry;
 	module_path = current_module_path;
 	return result;
 }
@@ -414,7 +414,6 @@ LLVMModuleRef build_module(AstNode *file_node, char *dir, char *name, bool entry
     module = LLVMModuleCreateWithNameInContext(name, context);
 	module_dir = dir;
 	module_path = file_node->as.file.path;
-	module_is_entry = entry;
 
 	current_scope = &global_scope;
 

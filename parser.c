@@ -358,7 +358,7 @@ static AstNode *parse_block() {
 	return block_node;
 }
 
-static AstNode *parse_function() {
+static AstNode *parse_function(bool external) {
 	AstNode *fn_node = create_node(AST_FUNCTION);
 	current_token++;
 	if (current_token->type != TOKEN_IDENTIFIER) {
@@ -367,7 +367,7 @@ static AstNode *parse_function() {
 		exit(1);
 	}
 
-		
+	fn_node->as.fn.external = external;
     fn_node->as.fn.name.p = current_token->raw;
     fn_node->as.fn.name.length = current_token->length;
 	current_token++;
@@ -427,8 +427,8 @@ static AstNode *parse_function() {
 		fn_node->as.fn.type = NULL;
 	}
 
-	if (current_token->type == TOKEN_LEFT_BRACE) {
-		current_token++;
+	if (!external) {
+		consume(TOKEN_LEFT_BRACE);
 		list_init(&fn_node->as.fn.statements, sizeof(AstNode *));
 		while (current_token->type != TOKEN_RIGHT_BRACE && (current_token - (Token *)tokens->elements) < tokens->length) {
 			AstNode *statement = parse_statement();
@@ -462,8 +462,11 @@ static AstNode *parse_import() {
 
 static AstNode *parse_declaration() {
 	switch (current_token->type) {
+	case TOKEN_EXTERN:
+		current_token++;
+		return parse_function(true);
 	case TOKEN_FUN:
-		return parse_function();
+		return parse_function(false);
 	case TOKEN_IMPORT:
 		return parse_import();
 	default:

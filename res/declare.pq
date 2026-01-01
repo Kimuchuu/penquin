@@ -1,5 +1,5 @@
-fun puts(str: *s1): s4;
-fun abort();
+extern fun puts(str: *s1): s4;
+extern fun abort();
 
 fun main(): s4 {
 	puts("first test");

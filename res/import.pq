@@ -1,6 +1,6 @@
 import "hello"
 
-fun puts(str: *s1): s4;
+extern fun puts(str: *s1): s4;
 
 fun main(): s4 {
 	msg = hello::say();
