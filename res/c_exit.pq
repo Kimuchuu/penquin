@@ -5,5 +5,5 @@ fun main(): s4 {
 	puts("first test");
 	exit(42);
 	puts("second test");
-	69;
+	return 69;
 }

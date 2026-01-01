@@ -3,5 +3,5 @@ fun main(): s4 {
 	y = 6;
 	z = x + y;
 	z = z + 1;
-	z;
+	return z;
 }

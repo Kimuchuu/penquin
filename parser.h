@@ -55,6 +55,10 @@ typedef struct {
 	String name;
 } Parameter;
 
+typedef struct {
+	struct AstNode *expression;
+} Return;
+
 typedef struct Type {
 	bool pointer;
 	String name;
@@ -76,6 +80,7 @@ typedef enum {
     AST_IMPORT,
     AST_NUMBER,
     AST_OPERATOR,
+    AST_RETURN,
     AST_STRING,
     AST_VARIABLE,
     AST_WHILE,
@@ -95,6 +100,7 @@ typedef struct AstNode {
 		Import       import;
         float        number;
 		Operator     operator_;
+        Return       return_;
         String       string;
 		While        while_;
     } as;

@@ -13,5 +13,5 @@ fun main(): s4 {
 		puts("x = 0");
 	}
 
-	0;
+	return 0;
 }

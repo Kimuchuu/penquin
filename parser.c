@@ -101,6 +101,12 @@ static void print_tree(AstNode *node) {
             print_tree(node->as.operator_.right);
             printf(")");
             break;
+	    case AST_RETURN: {
+            printf("(return ");
+			print_tree(node->as.return_.expression);
+            printf(")");
+            break;
+		}
         case AST_STRING:
         case AST_VARIABLE: {
 			DEFINE_CSTRING(str, node->as.string)
@@ -288,6 +294,13 @@ static AstNode *parse_expression_statement() {
     return expression;
 }
 
+static AstNode *parse_return_statement() {
+	AstNode *return_node = create_node(AST_RETURN);
+	current_token++;
+	return_node->as.return_.expression = parse_expression_statement();
+	return return_node;
+}
+
 static AstNode *parse_block();
 
 static AstNode *parse_if_statement() {
@@ -320,6 +333,8 @@ static AstNode *parse_statement() {
 		return parse_while_statement();
 	case TOKEN_IF:
 		return parse_if_statement();
+	case TOKEN_RETURN:
+		return parse_return_statement();
 	case TOKEN_LEFT_BRACE:
 		return parse_block();
 	default:

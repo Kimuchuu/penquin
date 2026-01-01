@@ -44,6 +44,7 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(NUMBER);
         CASE_TOKEN(PERCENT);
         CASE_TOKEN(PLUS);
+        CASE_TOKEN(RETURN);
         CASE_TOKEN(RIGHT_BRACE);
         CASE_TOKEN(RIGHT_PAREN);
         CASE_TOKEN(SEMICOLON);
@@ -122,6 +123,8 @@ static void scan_token() {
 			token.type = TOKEN_WHILE;
 		} else if (len == 6 && strncmp(token.raw, "import", 6) == 0) {
 			token.type = TOKEN_IMPORT;
+		} else if (len == 6 && strncmp(token.raw, "return", 6) == 0) {
+			token.type = TOKEN_RETURN;
 		} else {
 			token.type = TOKEN_IDENTIFIER;
 		}

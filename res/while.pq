@@ -6,6 +6,6 @@ fun main(): s4 {
 		x = x - 1;
 		puts("yoyoyo this is me talking, yk");
 	}
-	0;
+	return 0;
 }
 

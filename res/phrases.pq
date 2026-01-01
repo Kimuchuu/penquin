@@ -1,3 +1,3 @@
 fun hello(): *s1 {
-	"hello";
+	return "hello";
 }

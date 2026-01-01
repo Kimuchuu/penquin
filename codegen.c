@@ -246,11 +246,9 @@ static LLVMValueRef parse_function(AstNode *node) {
 		}
 		
 
-		LLVMValueRef exit_code = NULL;
 		for (int i = 0; i < node->as.fn.statements.length; i++) {
-			exit_code = parse_node(LIST_GET(AstNode *, &node->as.fn.statements, i));
+			parse_node(LIST_GET(AstNode *, &node->as.fn.statements, i));
 		}
-		LLVMBuildRet(builder, exit_code);
 		LLVMPositionBuilderAtEnd(builder, block);
 	}
 
@@ -260,9 +258,9 @@ static LLVMValueRef parse_function(AstNode *node) {
 }
 
 static LLVMValueRef parse_while(AstNode *node) {
-	LLVMBasicBlockRef start_block = LLVMAppendBasicBlockInContext(context, *current_function, "");
-	LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(context, *current_function, "");
-	LLVMBasicBlockRef end_block = LLVMAppendBasicBlockInContext(context, *current_function, "");
+	LLVMBasicBlockRef start_block = LLVMAppendBasicBlockInContext(context, *current_function, "while.start");
+	LLVMBasicBlockRef body_block = LLVMAppendBasicBlockInContext(context, *current_function, "while.body");
+	LLVMBasicBlockRef end_block = LLVMAppendBasicBlockInContext(context, *current_function, "while.end");
 
 	LLVMBuildBr(builder, start_block);
 	LLVMPositionBuilderAtEnd(builder, start_block);
@@ -280,32 +278,41 @@ static LLVMValueRef parse_while(AstNode *node) {
 }
 
 static LLVMValueRef parse_if(AstNode *node) {
-	LLVMBasicBlockRef then_block = LLVMAppendBasicBlockInContext(context, *current_function, "then");
+	LLVMBasicBlockRef then_block = LLVMAppendBasicBlockInContext(context, *current_function, "if.then");
 	LLVMBasicBlockRef else_block;
 	if (node->as.if_.else_statement != NULL) {
-		else_block = LLVMAppendBasicBlockInContext(context, *current_function, "else");
+		else_block = LLVMAppendBasicBlockInContext(context, *current_function, "if.else");
 	} else {
 		else_block = NULL;
 	}
-	LLVMBasicBlockRef end_block = LLVMAppendBasicBlockInContext(context, *current_function, "end");
+	LLVMBasicBlockRef end_block = LLVMAppendBasicBlockInContext(context, *current_function, "if.end");
 	
 	LLVMValueRef expr = parse_node(node->as.if_.condition);
 	LLVMValueRef null = LLVMConstNull(LLVMTypeOf(expr));
 	LLVMValueRef cond = LLVMBuildICmp(builder, LLVMIntNE, expr, null, "");
-	LLVMBuildCondBr(builder, cond, then_block, then_block == NULL ? end_block : else_block);
+	LLVMBuildCondBr(builder, cond, then_block, else_block == NULL ? end_block : else_block);
 
 	LLVMPositionBuilderAtEnd(builder, then_block);
-	parse_node(node->as.if_.statement);
-	LLVMBuildBr(builder, end_block);
-
-	if (then_block != NULL) {
-		LLVMPositionBuilderAtEnd(builder, else_block);
-		parse_node(node->as.if_.else_statement);
+	LLVMValueRef statement_value = parse_node(node->as.if_.statement);
+	if (statement_value == NULL || LLVMGetInstructionOpcode(statement_value) > LLVMUnreachable) {
 		LLVMBuildBr(builder, end_block);
+	}
+
+	if (else_block != NULL) {
+		LLVMPositionBuilderAtEnd(builder, else_block);
+		LLVMValueRef then_value = parse_node(node->as.if_.else_statement);
+		if (then_value == NULL || LLVMGetInstructionOpcode(then_value) > LLVMUnreachable) {
+			LLVMBuildBr(builder, end_block);
+		}
 	}
 	
 	LLVMPositionBuilderAtEnd(builder, end_block);
 	return NULL;
+}
+
+static LLVMValueRef parse_return(AstNode *node) {
+	LLVMValueRef expr = parse_node(node->as.return_.expression);
+	return LLVMBuildRet(builder, expr);
 }
 
 static LLVMValueRef parse_block(AstNode *node) {
@@ -313,12 +320,13 @@ static LLVMValueRef parse_block(AstNode *node) {
     table_init(&locals);
 	Scope block_scope = { .prev = current_scope, .locals = &locals };
 	current_scope = &block_scope;
+	LLVMValueRef value;
 	for (int i = 0; i < node->as.block.statements.length; i++) {
 		AstNode *stmnt = LIST_GET(AstNode *, &node->as.block.statements, i);
-		parse_node(stmnt);
+		value = parse_node(stmnt);
 	}
 	current_scope = block_scope.prev;
-	return NULL;
+	return value;
 }
 
 static LLVMValueRef parse_import(AstNode *node) {
@@ -384,6 +392,8 @@ static LLVMValueRef parse_node(AstNode *node) {
 			return parse_while(node);
 		case AST_IF:
 			return parse_if(node);
+		case AST_RETURN:
+			return parse_return(node);
 		case AST_BLOCK:
 			return parse_block(node);
 		case AST_IMPORT:
