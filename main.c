@@ -29,7 +29,7 @@ void traverse_imports(Table *file_node_table, AstNode *file_node, char *dir) {
 	for (int i = 0; i < nodes->length; i++) {
 		AstNode *node = LIST_GET(AstNode *, nodes, i);
 		if (node->type == AST_IMPORT) {
-			char *import_path = resolve_module_path(dir, node->left->as.string);
+			char *import_path = resolve_module_path(dir, node->as.import.path);
 			char *import_dir = get_directory(import_path);
 
 #ifdef DEBUG

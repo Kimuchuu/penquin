@@ -17,44 +17,40 @@ typedef struct {
 
 Scanner scanner;
 List *list;
-static enum TokenType prev_token_type;
+static TokenType prev_token_type;
 
 
-const char *token_type_to_string(enum TokenType type) {
+const char *token_type_to_string(TokenType type) {
     switch (type) {
-        CASE_TOKEN(LEFT_BRACE);
-        CASE_TOKEN(RIGHT_BRACE);
-        CASE_TOKEN(LEFT_PAREN);
-        CASE_TOKEN(RIGHT_PAREN);
         CASE_TOKEN(COLON);
-        CASE_TOKEN(DOUBLE_COLON);
-        CASE_TOKEN(SEMICOLON);
         CASE_TOKEN(COMMA);
-
-        CASE_TOKEN(EQUAL);
-        CASE_TOKEN(PLUS);
-        CASE_TOKEN(MINUS);
-        CASE_TOKEN(STAR);
-        CASE_TOKEN(SLASH);
-        CASE_TOKEN(PERCENT);
+        CASE_TOKEN(DOUBLE_COLON);
         CASE_TOKEN(DOUBLE_EQUAL);
-        CASE_TOKEN(LESS_THAN);
-        CASE_TOKEN(GREATER_THAN);
-        CASE_TOKEN(LESS_THAN_OR_EQUAL);
-        CASE_TOKEN(GREATER_THAN_OR_EQUAL);
-
-        CASE_TOKEN(NUMBER);
-        CASE_TOKEN(STRING);
-        CASE_TOKEN(IDENTIFIER);
-    	CASE_TOKEN(FUN);
-    	CASE_TOKEN(WHILE);
-    	CASE_TOKEN(IF);
     	CASE_TOKEN(ELSE);
-
-		CASE_TOKEN(IMPORT);
-
-        CASE_TOKEN(ERROR);
         CASE_TOKEN(EOF);
+        CASE_TOKEN(EQUAL);
+        CASE_TOKEN(ERROR);
+    	CASE_TOKEN(FUN);
+        CASE_TOKEN(GREATER_THAN);
+        CASE_TOKEN(GREATER_THAN_OR_EQUAL);
+        CASE_TOKEN(IDENTIFIER);
+    	CASE_TOKEN(IF);
+		CASE_TOKEN(IMPORT);
+        CASE_TOKEN(LEFT_BRACE);
+        CASE_TOKEN(LEFT_PAREN);
+        CASE_TOKEN(LESS_THAN);
+        CASE_TOKEN(LESS_THAN_OR_EQUAL);
+        CASE_TOKEN(MINUS);
+        CASE_TOKEN(NUMBER);
+        CASE_TOKEN(PERCENT);
+        CASE_TOKEN(PLUS);
+        CASE_TOKEN(RIGHT_BRACE);
+        CASE_TOKEN(RIGHT_PAREN);
+        CASE_TOKEN(SEMICOLON);
+        CASE_TOKEN(SLASH);
+        CASE_TOKEN(STAR);
+        CASE_TOKEN(STRING);
+    	CASE_TOKEN(WHILE);
         default: return "INVALID";
     }
 }

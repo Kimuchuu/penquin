@@ -3,7 +3,7 @@
 
 #include "list.h"
 
-enum TokenType {
+typedef enum {
     TOKEN_LEFT_BRACE,
     TOKEN_RIGHT_BRACE,
     TOKEN_LEFT_PAREN,
@@ -37,17 +37,17 @@ enum TokenType {
     TOKEN_WHILE,
 	TOKEN_IF,
 	TOKEN_ELSE,
-};
+} TokenType;
 
 typedef struct {
     int line;
     int col;
-    enum TokenType type;
+    TokenType type;
     int length;
     char *raw;
 } Token;
 
-const char *token_type_to_string(enum TokenType type);
+const char *token_type_to_string(TokenType type);
 void scan(char *source, List *tokens);
 
 #endif

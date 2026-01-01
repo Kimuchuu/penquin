@@ -19,90 +19,18 @@ static void print_tree(AstNode *node) {
         return;
     }
     switch (node->type) {
-        case AST_NUMBER:
-            printf("%f", node->as.number);
-            break;
-        case AST_OPERATOR:
-            printf("(");
-            print_tree(node->left);
-            printf(" %c ", node->as.op);
-            print_tree(node->right);
-            printf(")");
-            break;
-        case AST_VARIABLE:
-        case AST_STRING: {
-            char str[node->as.string.length + 1];
-            str[node->as.string.length] = '\0';
-            memcpy(str, node->as.string.p, node->as.string.length);
-            printf("%s", str);
-            break;
-        }
         case AST_ACCESSOR:
             printf("(");
-            print_tree(node->left);
+            print_tree(node->as.accessor.left);
             printf("::");
-            print_tree(node->right);
+            print_tree(node->as.accessor.right);
             printf(")");
             break;
 	    case AST_ASSIGNMENT:
             printf("(");
-            print_tree(node->left);
+            print_tree(node->as.assignment.left);
             printf(" = ");
-            print_tree(node->right);
-            printf(")");
-            break;
-        case AST_FILE:
-            printf("(%s\n", node->as.file.path);
-			List *nodes = &node->as.file.nodes;
-			for (int i = 0; i < nodes->length; i++) {
-				print_tree(LIST_GET(AstNode *, nodes, i));
-			}
-            printf(")");
-            break;
-        case AST_FUNCTION_CALL:
-            printf("(");
-            print_tree(node->left);
-			List *arguments = &node->as.arguments;
-			for (int i = 0; i < arguments->length; i++) {
-				printf(" ");
-				print_tree(LIST_GET(AstNode *, arguments, i));
-			}
-            printf(")");
-            break;
-        case AST_FUNCTION:
-            printf("(fn:");
-			print_tree(node->left);
-			List *parameters = &node->as.fn.parameters;
-			Parameter parameter;
-			for (int i = 0; i < parameters->length; i++) {
-				parameter = LIST_GET(Parameter, parameters, i);
-				char str[parameter.type.length + 1];
-				str[parameter.type.length] = '\0';
-				memcpy(str, parameter.type.p, parameter.type.length);
-				printf(" %s", str);
-			}
-            printf(")");
-            break;
-	    case AST_IMPORT:
-            printf("(import ");
-            print_tree(node->left);
-            printf(")");
-            break;
-        case AST_WHILE:
-            printf("(while ");
-            print_tree(node->left);
-            print_tree(node->right);
-            printf(")");
-            break;
-        case AST_IF:
-            printf("(if ");
-            print_tree(node->as.condition);
-			printf("then ");
-            print_tree(node->left);
-			if (node->right != NULL) {
-				printf("else ");
-				print_tree(node->left);
-			}
+            print_tree(node->as.assignment.right);
             printf(")");
             break;
         case AST_BLOCK:
@@ -115,10 +43,80 @@ static void print_tree(AstNode *node) {
         		}
             printf(")");
             break;
+        case AST_FILE:
+            printf("(%s\n", node->as.file.path);
+			List *nodes = &node->as.file.nodes;
+			for (int i = 0; i < nodes->length; i++) {
+				print_tree(LIST_GET(AstNode *, nodes, i));
+			}
+            printf(")");
+            break;
+        case AST_FUNCTION:
+            printf("(fn:");
+			print_tree(node->as.fn.variable);
+			List *parameters = &node->as.fn.parameters;
+			Parameter parameter;
+			for (int i = 0; i < parameters->length; i++) {
+				parameter = LIST_GET(Parameter, parameters, i);
+				char str[parameter.type.length + 1];
+				str[parameter.type.length] = '\0';
+				memcpy(str, parameter.type.p, parameter.type.length);
+				printf(" %s", str);
+			}
+            printf(")");
+            break;
+        case AST_FUNCTION_CALL:
+            printf("(");
+            print_tree(node->as.call.variable);
+			List *arguments = &node->as.call.arguments;
+			for (int i = 0; i < arguments->length; i++) {
+				printf(" ");
+				print_tree(LIST_GET(AstNode *, arguments, i));
+			}
+            printf(")");
+            break;
+        case AST_IF:
+            printf("(if ");
+            print_tree(node->as.if_.condition);
+			printf("then ");
+            print_tree(node->as.if_.statement);
+			if (node->as.if_.else_statement != NULL) {
+				printf("else ");
+				print_tree(node->as.if_.else_statement);
+			}
+            printf(")");
+            break;
+	    case AST_IMPORT: {
+			DEFINE_CSTRING(path, node->as.import.path)
+            printf("(import %s)", path);
+            break;
+		}
+        case AST_NUMBER:
+            printf("%f", node->as.number);
+            break;
+        case AST_OPERATOR:
+            printf("(");
+            print_tree(node->as.operator_.left);
+            printf(" %c ", node->as.operator_.type);
+            print_tree(node->as.operator_.right);
+            printf(")");
+            break;
+        case AST_STRING:
+        case AST_VARIABLE: {
+			DEFINE_CSTRING(str, node->as.string)
+            printf("%s", str);
+            break;
+        }
+        case AST_WHILE:
+            printf("(while ");
+            print_tree(node->as.while_.statement);
+            print_tree(node->as.while_.condition);
+            printf(")");
+            break;
     }
 }
 
-static void consume(enum TokenType type) {
+static void consume(TokenType type) {
     if (current_token->type != type) {
         fprintf(stderr, "Epic fail, expected token: %s.\n", token_type_to_string(type));
         exit(1);
@@ -126,7 +124,7 @@ static void consume(enum TokenType type) {
     current_token++;
 }
 
-static char consume_if(enum TokenType type) {
+static char consume_if(TokenType type) {
     if (current_token->type != type) {
         return 0;
     }
@@ -137,8 +135,6 @@ static char consume_if(enum TokenType type) {
 static inline AstNode *create_node(AstType type) {
     AstNode *node = malloc(sizeof(AstNode));
     node->type = type;
-    node->left = NULL;
-    node->right = NULL;
     return node;
 }
 
@@ -151,7 +147,7 @@ static AstNode *create_number() {
 
 static AstNode *create_operator() {
     AstNode *node = create_node(AST_OPERATOR);
-    node->as.op = current_token->type;
+    node->as.operator_.type = current_token->type;
     return node;
 }
 
@@ -199,8 +195,8 @@ static AstNode *parse_accessor() {
 			exit(1);
 		}
 		AstNode *accessor_node = create_node(AST_ACCESSOR);
-		accessor_node->left = primary;
-		accessor_node->right = create_variable();
+		accessor_node->as.accessor.left = primary;
+		accessor_node->as.accessor.right = create_variable();
 		current_token++;
 		primary = accessor_node;
 	}
@@ -212,16 +208,16 @@ static AstNode *parse_call() {
 	if ((accessor->type == AST_VARIABLE || accessor->type == AST_ACCESSOR) && current_token->type == TOKEN_LEFT_PAREN) {
 		current_token++;
 		AstNode *call = create_node(AST_FUNCTION_CALL);
-		call->left = accessor;
+		call->as.call.variable = accessor;
 		accessor = call;
-		list_init(&call->as.arguments, sizeof(AstNode *));
+		list_init(&call->as.call.arguments, sizeof(AstNode *));
 		if (current_token->type != TOKEN_RIGHT_PAREN) {
 			AstNode *argument = parse_expression();
-			list_add(&call->as.arguments, &argument);
+			list_add(&call->as.call.arguments, &argument);
 			while (current_token->type == TOKEN_COMMA) {
 				current_token++;
 				argument = parse_expression();
-				list_add(&call->as.arguments, &argument);
+				list_add(&call->as.call.arguments, &argument);
 			}
 		}
 		consume(TOKEN_RIGHT_PAREN);
@@ -234,9 +230,8 @@ static AstNode *parse_factor() {
     while (current_token->type == TOKEN_STAR || current_token->type == TOKEN_SLASH) {
         AstNode *operator = create_operator();
         current_token++;
-        operator->left = call;
-        AstNode *other = parse_call();
-        operator->right = other;
+        operator->as.operator_.left = call;
+        operator->as.operator_.right = parse_call();
         call = operator;
     }
     return call;
@@ -247,9 +242,8 @@ static AstNode *parse_term() {
     while (current_token->type == TOKEN_PLUS || current_token->type == TOKEN_MINUS) {
         AstNode *operator = create_operator();
         current_token++;
-        operator->left = factor;
-        AstNode *other = parse_factor();
-        operator->right = other;
+        operator->as.operator_.left = factor;
+        operator->as.operator_.right = parse_factor();
         factor = operator;
     }
     return factor;
@@ -264,9 +258,8 @@ static AstNode *parse_comparison() {
 		current_token->type == TOKEN_LESS_THAN_OR_EQUAL) {
         AstNode *operator = create_operator();
         current_token++;
-        operator->left = term;
-        AstNode *other = parse_term();
-        operator->right = other;
+        operator->as.operator_.left = term;
+        operator->as.operator_.right = parse_term();
 		term = operator;
 	}
     return term;
@@ -278,8 +271,8 @@ static AstNode *parse_assignment() {
         assert(dst->type == AST_VARIABLE);
         AstNode *ass = create_node(AST_ASSIGNMENT);
         current_token++;
-        ass->left = dst;
-        ass->right = parse_comparison();
+        ass->as.assignment.left = dst;
+        ass->as.assignment.right = parse_comparison();
         dst = ass;
     }
     return dst;
@@ -301,11 +294,13 @@ static AstNode *parse_if_statement() {
 	AstNode *if_node = create_node(AST_IF);
 	current_token++;
 
-	if_node->as.condition = parse_expression();
-	if_node->left = parse_block();
+	if_node->as.if_.condition = parse_expression();
+	if_node->as.if_.statement = parse_block();
 	if (current_token->type == TOKEN_ELSE) {
 		current_token++;
-		if_node->right = parse_statement();
+		if_node->as.if_.else_statement = parse_statement();
+	} else {
+		if_node->as.if_.else_statement = NULL;
 	}
 	
 	return if_node;
@@ -314,8 +309,8 @@ static AstNode *parse_if_statement() {
 static AstNode *parse_while_statement() {
 	AstNode *while_node = create_node(AST_WHILE);
 	current_token++;
-	while_node->left = parse_expression();
-	while_node->right = parse_block();
+	while_node->as.while_.condition = parse_expression();
+	while_node->as.while_.statement = parse_block();
 	return while_node;
 }
 
@@ -356,10 +351,7 @@ static AstNode *parse_function() {
 	}
 
 		
-	AstNode *identifier_node = create_variable();
-	identifier_node->as.string.p = current_token->raw;
-	identifier_node->as.string.length = current_token->length;
-	fn_node->left = identifier_node;
+	fn_node->as.fn.variable = create_variable();
 	current_token++;
 
 	consume(TOKEN_LEFT_PAREN);
@@ -443,7 +435,8 @@ static AstNode *parse_import() {
 		exit(1);
 	}
 	
-    import_node->left = create_string();
+    import_node->as.import.path.p = current_token->raw + 1;
+    import_node->as.import.path.length = current_token->length - 2;
 	current_token++;
 
 	return import_node;

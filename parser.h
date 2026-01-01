@@ -7,10 +7,47 @@
 #include "token.h"
 
 typedef struct {
+	List statements;
+} Block;
+
+typedef struct {
+	struct AstNode *left;
+	struct AstNode *right;
+} Binary;
+
+typedef struct {
 	char *path;
 	List tokens;
 	List nodes;
 } File;
+
+typedef struct {
+	struct AstNode *variable;
+	List parameters;
+	List statements;
+	struct Type *type;
+} Function;
+
+typedef struct {
+	struct AstNode *variable;
+	List arguments;
+} FunctionCall;
+
+typedef struct {
+	struct AstNode *condition;
+	struct AstNode *statement;
+	struct AstNode *else_statement;
+} If;
+
+typedef struct {
+	String path;
+} Import;
+
+typedef struct {
+	TokenType type;
+	struct AstNode *left;
+	struct AstNode *right;
+} Operator;
 
 typedef struct {
 	bool pointer;
@@ -18,59 +55,53 @@ typedef struct {
 	String name;
 } Parameter;
 
-typedef struct {
+typedef struct Type {
 	bool pointer;
 	String name;
 } Type;
 
 typedef struct {
-	List parameters;
-	List statements;
-	Type *type;
-} Function;
-
-typedef struct {
-	List statements;
-} Block;
+	struct AstNode *condition;
+	struct AstNode *statement;
+} While;
 
 typedef enum {
+    AST_ACCESSOR,
+    AST_ASSIGNMENT,
+    AST_BLOCK,
+    AST_FILE,
+    AST_FUNCTION,
+    AST_FUNCTION_CALL,
+    AST_IF,
+    AST_IMPORT,
     AST_NUMBER,
+    AST_OPERATOR,
     AST_STRING,
     AST_VARIABLE,
-    AST_FUNCTION,
     AST_WHILE,
-    AST_IF,
-    AST_BLOCK,
-
-    AST_OPERATOR,
-    AST_ASSIGNMENT,
-    AST_FUNCTION_CALL,
-	
-    AST_IMPORT,
-    AST_ACCESSOR,
-
-    AST_FILE,
 } AstType;
 
 
 typedef struct AstNode {
     AstType type;
     union {
-        float number;
-        enum TokenType op;
-        String string;
-		List arguments;
-		Block block;
-		Function fn;
-		File file;
-		struct AstNode *condition;
+		Binary       accessor;
+        Binary       assignment;
+		Block        block;
+		FunctionCall call;
+		File         file;
+		Function     fn;
+		If           if_;
+		Import       import;
+        float        number;
+		Operator     operator_;
+        String       string;
+		While        while_;
     } as;
-    struct AstNode *left;
-    struct AstNode *right;
 } AstNode;
 
 
-void parse(List *t, List *nodes);
+void     parse(List *t, List *nodes);
 AstNode *parse_file(char *path, List *t);
 
 #endif
