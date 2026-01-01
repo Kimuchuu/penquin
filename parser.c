@@ -26,13 +26,13 @@ static void print_tree(AstNode *node) {
             print_tree(node->as.accessor.right);
             printf(")");
             break;
-	    case AST_ASSIGNMENT:
-            printf("(");
-            print_tree(node->as.assignment.left);
-            printf(" = ");
-            print_tree(node->as.assignment.right);
+	    case AST_ASSIGNMENT: {
+			DEFINE_CSTRING(name, node->as.assignment.name)
+            printf("(%s = ", name);
+            print_tree(node->as.assignment.value);
             printf(")");
             break;
+		}
         case AST_BLOCK:
             printf("(");
         		List *statements = &node->as.block.statements;
@@ -51,9 +51,9 @@ static void print_tree(AstNode *node) {
 			}
             printf(")");
             break;
-        case AST_FUNCTION:
-            printf("(fn:");
-			print_tree(node->as.fn.variable);
+        case AST_FUNCTION: {
+			DEFINE_CSTRING(name, node->as.fn.name)
+            printf("(fn:%s", name);
 			List *parameters = &node->as.fn.parameters;
 			Parameter parameter;
 			for (int i = 0; i < parameters->length; i++) {
@@ -65,6 +65,7 @@ static void print_tree(AstNode *node) {
 			}
             printf(")");
             break;
+		}
         case AST_FUNCTION_CALL:
             printf("(");
             print_tree(node->as.call.variable);
@@ -277,8 +278,9 @@ static AstNode *parse_assignment() {
         assert(dst->type == AST_VARIABLE);
         AstNode *ass = create_node(AST_ASSIGNMENT);
         current_token++;
-        ass->as.assignment.left = dst;
-        ass->as.assignment.right = parse_comparison();
+        ass->as.assignment.name = dst->as.string;
+        ass->as.assignment.value = parse_comparison();
+		free(dst);
         dst = ass;
     }
     return dst;
@@ -366,7 +368,8 @@ static AstNode *parse_function() {
 	}
 
 		
-	fn_node->as.fn.variable = create_variable();
+    fn_node->as.fn.name.p = current_token->raw;
+    fn_node->as.fn.name.length = current_token->length;
 	current_token++;
 
 	consume(TOKEN_LEFT_PAREN);

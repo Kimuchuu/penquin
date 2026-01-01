@@ -7,6 +7,11 @@
 #include "token.h"
 
 typedef struct {
+	String name;
+	struct AstNode *value;
+} Assignment;
+
+typedef struct {
 	List statements;
 } Block;
 
@@ -22,7 +27,7 @@ typedef struct {
 } File;
 
 typedef struct {
-	struct AstNode *variable;
+	String name;
 	List parameters;
 	List statements;
 	struct Type *type;
@@ -91,7 +96,7 @@ typedef struct AstNode {
     AstType type;
     union {
 		Binary       accessor;
-        Binary       assignment;
+        Assignment   assignment;
 		Block        block;
 		FunctionCall call;
 		File         file;
