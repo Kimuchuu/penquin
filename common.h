@@ -18,6 +18,7 @@ typedef struct {
 char  *cstring_concat_String(char *c, String s);
 char  *cstring_duplicate(char *str);
 String String_concat_cstring(String s, char *c);
+int    String_cmp(String s, char *c);
 void   String_free(String s);
 char  *String_to_cstring(String s);
 

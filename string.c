@@ -27,6 +27,14 @@ String String_concat_cstring(String s, char *c) {
 	return res;
 }
 
+int String_cmp(String s, char *c) {
+	int clen = strlen(c);
+	if (clen != s.length) {
+		return s.length - clen;
+	}
+	return strncmp(s.p, c, clen);
+}
+
 void String_free(String s) {
 	free(s.p);
 }
