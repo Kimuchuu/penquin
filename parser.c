@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "parser.h"
+#include "common.h"
 #include "list.h"
 #include "token.h"
 
@@ -158,10 +159,29 @@ static AstNode *create_operator() {
     return node;
 }
 
+static String escape_string(String original) {
+	char *str = malloc(original.length + 1);
+	char last = '\0';
+	char pos = 0;
+
+	for (int i = 0; i < original.length; i++) {
+		char current = original.p[i];
+		if (last == '\\' && current == 'n') {
+			str[pos - 1] = '\n';
+		} else {
+			str[pos++] = current;
+		}
+		last = original.p[i];
+	}
+	String res = { .p = str, .length = pos };
+	return res;
+}
+
 static AstNode *create_string() {
     AstNode *node = create_node(AST_STRING);
     node->as.string.p = current_token->raw + 1;
     node->as.string.length = current_token->length - 2;
+	node->as.string = escape_string(node->as.string);
     return node;
 }
 
