@@ -243,6 +243,12 @@ static LLVMValueRef parse_function(AstNode *node) {
 		LLVMPositionBuilderAtEnd(builder, block);
 	}
 
+	if (node->as.fn.type == NULL &&
+		(node->as.fn.statements.elements == NULL ||
+		LIST_GET(AstNode *, &node->as.fn.statements, node->as.fn.statements.length - 1)->type != AST_RETURN)) {
+		LLVMBuildRetVoid(builder);
+	}
+
 	current_function = NULL;
 	current_scope = function_scope.prev;
 	return fn;
