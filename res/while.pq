@@ -1,10 +1,10 @@
-extern fun puts(str: *s1): s4;
+import "std:core"
 
 fun main(): s4 {
 	x = 5;
 	while x {
 		x = x - 1;
-		puts("yoyoyo this is me talking, yk");
+		core::print("yoyoyo this is me talking, yk");
 	}
 	return 0;
 }

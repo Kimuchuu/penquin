@@ -1,6 +1,6 @@
-extern fun puts(str: *s1): s4;
+import "std:core"
 
 fun hello(): *s1 {
-	puts("Congratulations you've found the hello phrase");
+	core::print("Congratulations you've found the hello phrase");
 	return "hello";
 }

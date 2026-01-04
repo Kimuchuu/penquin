@@ -32,6 +32,15 @@ char *module_dir;
 char *module_path;
 
 char *resolve_module_path(char *dir, String module_name) {
+	if (String_starts_with(module_name, "std:")) {
+		int size = 2 + module_name.length - 4 + 3 + 1;
+		char *full_path = malloc(size);
+		memcpy(full_path, "./std/", 6);
+		memcpy(full_path + 6, module_name.p + 4, module_name.length - 4);
+		memcpy(full_path + 6 + module_name.length - 4, ".pq", 4);
+		return full_path;
+	}
+
 	int dirlen = strlen(dir);
 	int size = dirlen + 1 + module_name.length + 3 + 1;
 	char *full_path = malloc(size);

@@ -2,6 +2,7 @@
 #define PENQUIN_COMMON_H
 
 #include <stdio.h>
+#include <stdbool.h>
 
 #define DEBUG
 
@@ -15,12 +16,13 @@ typedef struct {
     int length;
 } String;
 
-char  *cstring_concat_String(char *c, String s);
-char  *cstring_duplicate(char *str);
-String String_concat_cstring(String s, char *c);
-int    String_cmp(String s, char *c);
-void   String_free(String s);
-char  *String_to_cstring(String s);
+char   *cstring_concat_String(char *c, String s);
+char   *cstring_duplicate(char *str);
+int     String_cmp(String s, char *c);
+String  String_concat_cstring(String s, char *c);
+void    String_free(String s);
+bool    String_starts_with(String s, char *c);
+char   *String_to_cstring(String s);
 
 char *get_directory(char *path);
 char *path_to_name(char *path);

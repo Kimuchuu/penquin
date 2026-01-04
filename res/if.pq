@@ -1,16 +1,16 @@
-extern fun puts(str: *s1): s4;
+import "std:core"
 
 fun main(): s4 {
 	x = 12;
 	
 	if x >= 11 {
-		puts("x >= 10");
+		core::print("x >= 10");
 	} else if x < 10 {
-		puts("x < 10");
+		core::print("x < 10");
 	} else if x > 10 {
-		puts("x > 10");
+		core::print("x > 10");
 	} else {
-		puts("x = 0");
+		core::print("x = 0");
 	}
 
 	return 0;
