@@ -6,6 +6,7 @@
 typedef enum {
     TOKEN_COLON,
     TOKEN_COMMA,
+    TOKEN_DOT,
     TOKEN_DOUBLE_COLON,
     TOKEN_DOUBLE_EQUAL,
 	TOKEN_ELSE,
@@ -34,6 +35,7 @@ typedef enum {
     TOKEN_SLASH,
     TOKEN_STAR,
     TOKEN_STRING,
+    TOKEN_TRIPLE_DOT,
     TOKEN_WHILE,
 } TokenType;
 

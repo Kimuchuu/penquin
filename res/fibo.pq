@@ -1,4 +1,4 @@
-extern fun printf(s: *s1, number: s4);
+extern fun printf(s: *s1, ...);
 
 fun fib(n: s4): s4 {
     if n <= 1 {

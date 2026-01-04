@@ -24,6 +24,7 @@ const char *token_type_to_string(TokenType type) {
     switch (type) {
         CASE_TOKEN(COLON);
         CASE_TOKEN(COMMA);
+        CASE_TOKEN(DOT);
         CASE_TOKEN(DOUBLE_COLON);
         CASE_TOKEN(DOUBLE_EQUAL);
     	CASE_TOKEN(ELSE);
@@ -52,6 +53,7 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(SLASH);
         CASE_TOKEN(STAR);
         CASE_TOKEN(STRING);
+        CASE_TOKEN(TRIPLE_DOT);
     	CASE_TOKEN(WHILE);
         default: return "INVALID";
     }
@@ -160,6 +162,14 @@ static void scan_token() {
             break;
         case ',':
             token.type = TOKEN_COMMA;
+            break;
+        case '.':
+			if (token.raw[1] == '.' && token.raw[2] == '.') {
+				scanner.current +=2 ;
+				token.type = TOKEN_TRIPLE_DOT;
+			} else {
+				token.type = TOKEN_DOT;
+			}
             break;
         case '=':
 			if (token.raw[1] == '=') {

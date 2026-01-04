@@ -32,6 +32,7 @@ typedef struct {
 	List statements;
 	struct Type *type;
 	bool external;
+	bool vararg;
 } Function;
 
 typedef struct {

@@ -214,7 +214,7 @@ static LLVMValueRef parse_function_definition(char *name, AstNode *node) {
 		return_type,
 		parameters,
 		node->as.fn.parameters.length,
-		0
+		node->as.fn.vararg
 	);
     LLVMValueRef fn = LLVMAddFunction(module, name, fn_type);
 	table_put(global_scope.locals, name, fn);
