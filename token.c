@@ -39,6 +39,7 @@ const char *token_type_to_string(TokenType type) {
     	CASE_TOKEN(IF);
 		CASE_TOKEN(IMPORT);
         CASE_TOKEN(LEFT_BRACE);
+        CASE_TOKEN(LEFT_BRACKET);
         CASE_TOKEN(LEFT_PAREN);
         CASE_TOKEN(LESS_THAN);
         CASE_TOKEN(LESS_THAN_OR_EQUAL);
@@ -48,6 +49,7 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(PLUS);
         CASE_TOKEN(RETURN);
         CASE_TOKEN(RIGHT_BRACE);
+        CASE_TOKEN(RIGHT_BRACKET);
         CASE_TOKEN(RIGHT_PAREN);
         CASE_TOKEN(SEMICOLON);
         CASE_TOKEN(SLASH);
@@ -142,6 +144,12 @@ static void scan_token() {
             break;
         case '}':
             token.type = TOKEN_RIGHT_BRACE;
+            break;
+        case '[':
+            token.type = TOKEN_LEFT_BRACKET;
+            break;
+        case ']':
+            token.type = TOKEN_RIGHT_BRACKET;
             break;
         case '(':
             token.type = TOKEN_LEFT_PAREN;

@@ -7,6 +7,10 @@
 #include "token.h"
 
 typedef struct {
+	List items;
+} Array;
+
+typedef struct {
 	String name;
 	struct AstNode *value;
 } Assignment;
@@ -51,6 +55,11 @@ typedef struct {
 } Import;
 
 typedef struct {
+	struct AstNode *indexable;
+	struct AstNode *index;
+} ItemAccess;
+
+typedef struct {
 	TokenType type;
 	struct AstNode *left;
 	struct AstNode *right;
@@ -78,6 +87,7 @@ typedef struct {
 
 typedef enum {
     AST_ACCESSOR,
+    AST_ARRAY,
     AST_ASSIGNMENT,
     AST_BLOCK,
     AST_FILE,
@@ -85,6 +95,7 @@ typedef enum {
     AST_FUNCTION_CALL,
     AST_IF,
     AST_IMPORT,
+    AST_ITEM_ACCESS,
     AST_NUMBER,
     AST_OPERATOR,
     AST_RETURN,
@@ -98,6 +109,7 @@ typedef struct AstNode {
     AstType type;
     union {
 		Binary       accessor;
+		Array        array;
         Assignment   assignment;
 		Block        block;
 		FunctionCall call;
@@ -105,6 +117,7 @@ typedef struct AstNode {
 		Function     fn;
 		If           if_;
 		Import       import;
+		ItemAccess   item_access;
         float        number;
 		Operator     operator_;
         Return       return_;

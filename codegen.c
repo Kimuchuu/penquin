@@ -364,6 +364,30 @@ static LLVMValueRef parse_accessor(AstNode *node) {
 	return result;
 }
 
+static LLVMValueRef parse_array(AstNode *node) {
+	List items = node->as.array.items;
+	LLVMValueRef values[items.length];
+	for (int i = 0; i < items.length; i++) {
+		AstNode *i_node = LIST_GET(AstNode *, &items, i);
+		values[i] = parse_node(i_node);
+	}
+	
+	LLVMValueRef value = LLVMConstArray2(LLVMTypeOf(values[0]), values, items.length);
+	return value;
+}
+
+static LLVMValueRef parse_item_access(AstNode *node) {
+	LLVMValueRef indexable = parse_node(node->as.item_access.indexable);
+	LLVMValueRef index = handle_rvalue(parse_node(node->as.item_access.index));
+
+	LLVMValueRef indices[2];
+	indices[0] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0);
+	indices[1] = index;
+	LLVMValueRef ptr = LLVMBuildGEP2(builder, LLVMGetAllocatedType(indexable), indexable, indices, 2, "");
+
+	return LLVMBuildLoad2(builder, LLVMGetElementType(LLVMGetAllocatedType(indexable)), ptr, "");
+}
+
 static LLVMValueRef parse_file_node(AstNode *node) {
 	List *nodes = &node->as.file.nodes;
     for (int i = 0; i < nodes->length; i++) {
@@ -403,6 +427,10 @@ static LLVMValueRef parse_node(AstNode *node) {
 			return parse_import(node);
 		case AST_ACCESSOR:
 			return parse_accessor(node);
+		case AST_ARRAY:
+			return parse_array(node);
+		case AST_ITEM_ACCESS:
+			return parse_item_access(node);
 		default:
 			report_invalid_node("Unhandled node types");
     }

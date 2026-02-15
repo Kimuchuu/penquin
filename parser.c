@@ -27,6 +27,16 @@ static void print_tree(AstNode *node) {
             print_tree(node->as.accessor.right);
             printf(")");
             break;
+        case AST_ARRAY:
+            printf("[");
+			List *items = &node->as.array.items;
+			AstNode *item;
+			for (int i = 0; i < items->length; i++) {
+				item = LIST_GET(AstNode *, items, i);
+				print_tree(item);
+			}
+            printf("]");
+            break;
 	    case AST_ASSIGNMENT: {
 			DEFINE_CSTRING(name, node->as.assignment.name)
             printf("(%s = ", name);
@@ -88,6 +98,12 @@ static void print_tree(AstNode *node) {
 			}
             printf(")");
             break;
+		case AST_ITEM_ACCESS:
+			print_tree(node->as.item_access.indexable);
+			printf("[");
+			print_tree(node->as.item_access.index);
+			printf("]");
+			break;
 	    case AST_IMPORT: {
 			DEFINE_CSTRING(path, node->as.import.path)
             printf("(import %s)", path);
@@ -252,13 +268,27 @@ static AstNode *parse_call() {
     return accessor;
 }
 
-static AstNode *parse_factor() {
+static AstNode *parse_item_access() {
     AstNode *call = parse_call();
+	while (current_token->type == TOKEN_LEFT_BRACKET) {
+		current_token++;
+		AstNode *index = parse_expression();
+		consume(TOKEN_RIGHT_BRACKET);
+		AstNode *access = create_node(AST_ITEM_ACCESS);
+		access->as.item_access.index = index;
+		access->as.item_access.indexable = call;
+		call = access;
+	}
+	return call;
+}
+
+static AstNode *parse_factor() {
+    AstNode *call = parse_item_access();
     while (current_token->type == TOKEN_STAR || current_token->type == TOKEN_SLASH) {
         AstNode *operator = create_operator();
         current_token++;
         operator->as.operator_.left = call;
-        operator->as.operator_.right = parse_call();
+        operator->as.operator_.right = parse_item_access();
         call = operator;
     }
     return call;
@@ -292,14 +322,33 @@ static AstNode *parse_comparison() {
     return term;
 }
 
+static AstNode *parse_array() {
+    if (current_token->type == TOKEN_LEFT_BRACKET) {
+		current_token++;
+		AstNode *node = create_node(AST_ARRAY);
+		list_init(&node->as.array.items, sizeof(AstNode *));
+		while (current_token->type != TOKEN_RIGHT_BRACKET && (current_token - (Token *)tokens->elements) < tokens->length) {
+			AstNode *expr = parse_comparison();
+			list_add(&node->as.array.items, &expr);
+			if (!consume_if(TOKEN_COMMA)) {
+				break;
+			}
+		}
+		consume(TOKEN_RIGHT_BRACKET);
+		return node;
+	}
+
+	return parse_comparison();
+}
+
 static AstNode *parse_assignment() {
-    AstNode *dst = parse_comparison();
+    AstNode *dst = parse_array();
     if (current_token->type == TOKEN_EQUAL) {
         assert(dst->type == AST_VARIABLE);
         AstNode *ass = create_node(AST_ASSIGNMENT);
         current_token++;
         ass->as.assignment.name = dst->as.string;
-        ass->as.assignment.value = parse_comparison();
+        ass->as.assignment.value = parse_array();
 		free(dst);
         dst = ass;
     }

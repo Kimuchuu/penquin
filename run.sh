@@ -16,7 +16,8 @@ echo "[compiling]"
 # build/penquin ./res/getchar.pq
 # build/penquin ./res/while.pq
 # build/penquin ./res/if.pq
-build/penquin ./res/fibo.pq
+# build/penquin ./res/fibo.pq
+build/penquin ./res/array.pq
 
 # echo "[running]"
 # lli test.ll
