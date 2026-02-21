@@ -67,6 +67,7 @@ typedef struct {
 
 typedef struct {
 	bool pointer;
+	bool rest;
 	String type;
 	String name;
 } Parameter;

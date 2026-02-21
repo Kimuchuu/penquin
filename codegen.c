@@ -17,6 +17,7 @@
 typedef struct Scope {
 	struct Scope *prev;
 	Table *locals;
+	Table *definitions;
 } Scope;
 
 static LLVMContextRef context;
@@ -87,6 +88,12 @@ static LLVMValueRef lookup_identifier(String name) {
 
 	free(global_name);
 	return value_pointer;
+}
+
+static AstNode *lookup_definition(String name) {
+	DEFINE_CSTRING(global_name, name)
+	AstNode *node = (AstNode *)table_get(global_scope.definitions, global_name);
+	return node;
 }
 
 static LLVMValueRef handle_rvalue(LLVMValueRef rvalue) {
@@ -177,12 +184,52 @@ static LLVMValueRef parse_function_call(AstNode *node) {
 	LLVMValueRef fn = parse_node(node->as.call.variable);
 	LLVMTypeRef fn_type = LLVMGlobalGetValueType(fn);
 
-	LLVMValueRef args[node->as.call.arguments.length];
-	for (int i = 0; i < node->as.call.arguments.length; i++) {
-		args[i] = handle_rvalue(parse_node(LIST_GET(AstNode *, &node->as.call.arguments, i)));
+	size_t name_length;
+	const char *name = LLVMGetValueName2(fn, &name_length);
+	String Name = { .p = (char *)name, .length = name_length };
+	AstNode *fn_node = lookup_definition(Name);
+	List parameters = fn_node->as.fn.parameters;
+
+	bool rest = false;
+	if (parameters.length > 0) {
+		Parameter rest_parameter = LIST_GET(Parameter, &parameters, parameters.length - 1);
+		rest = rest_parameter.rest;
 	}
 
-	return LLVMBuildCall2(builder, fn_type, fn, args, node->as.call.arguments.length, "");
+	int n_arguments = fn_node->as.fn.vararg ? node->as.call.arguments.length : parameters.length;
+
+	LLVMValueRef args[n_arguments];
+	for (int i = 0; i < n_arguments; i++) {
+		if (rest && i == n_arguments - 1) {
+			int rest_length = node->as.call.arguments.length - i;
+			AstNode *item_node = LIST_GET(AstNode *, &node->as.call.arguments, i);
+			LLVMValueRef item = handle_rvalue(parse_node(item_node));
+			LLVMTypeRef item_type = LLVMTypeOf(item);
+			LLVMTypeRef array_type = LLVMArrayType2(item_type, rest_length);
+			LLVMValueRef alloca = LLVMBuildAlloca(builder, array_type, "");
+
+			LLVMValueRef indices[2];
+			indices[0] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0);
+			indices[1] = indices[0];
+			LLVMValueRef item_ptr = LLVMBuildGEP2(builder, array_type, alloca, indices, 2, "");
+			LLVMBuildStore(builder, item, item_ptr);
+
+			for (int j = i + 1; j < node->as.call.arguments.length; j++) {
+				item_node = LIST_GET(AstNode *, &node->as.call.arguments, j);
+				item = handle_rvalue(parse_node(item_node));
+
+				indices[1] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, j);
+				LLVMValueRef item_ptr = LLVMBuildGEP2(builder, array_type, alloca, indices, 2, "");
+				LLVMBuildStore(builder, item, item_ptr);
+			}
+
+			args[i] = alloca;
+		} else {
+			args[i] = handle_rvalue(parse_node(LIST_GET(AstNode *, &node->as.call.arguments, i)));
+		}
+	}
+
+	return LLVMBuildCall2(builder, fn_type, fn, args, n_arguments, "");
 }
 
 static LLVMValueRef parse_function_definition(char *name, AstNode *node) {
@@ -207,6 +254,9 @@ static LLVMValueRef parse_function_definition(char *name, AstNode *node) {
 			if (parameter.pointer) {
 				parameters[i] = LLVMPointerType(parameters[i], 0);
 			}
+			if (parameter.rest) {
+				parameters[i] = LLVMPointerType(parameters[i], 0);
+			}
 		}
 	}
 
@@ -218,6 +268,7 @@ static LLVMValueRef parse_function_definition(char *name, AstNode *node) {
 	);
     LLVMValueRef fn = LLVMAddFunction(module, name, fn_type);
 	table_put(global_scope.locals, name, fn);
+	table_put(global_scope.definitions, name, node);
 	return fn;
 }
 
@@ -240,9 +291,8 @@ static LLVMValueRef parse_function(AstNode *node) {
 			Parameter parameter = LIST_GET(Parameter, &node->as.fn.parameters, i);
 			char *param_name = String_to_cstring(parameter.name);
 			LLVMValueRef param_value = LLVMGetParam(fn, i);
-			LLVMValueRef param_pointer = LLVMBuildAlloca(builder, LLVMTypeOf(param_value), param_name);
-			LLVMBuildStore(builder, param_value, param_pointer);
-			table_put(&locals, param_name, param_pointer);
+			LLVMSetValueName2(param_value, param_name, parameter.name.length);
+			table_put(&locals, param_name, param_value);
 		}
 		
 
@@ -376,16 +426,35 @@ static LLVMValueRef parse_array(AstNode *node) {
 	return value;
 }
 
+// TODO: tempory works, but a lot wrong here
 static LLVMValueRef parse_item_access(AstNode *node) {
 	LLVMValueRef indexable = parse_node(node->as.item_access.indexable);
 	LLVMValueRef index = handle_rvalue(parse_node(node->as.item_access.index));
 
-	LLVMValueRef indices[2];
-	indices[0] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0);
-	indices[1] = index;
-	LLVMValueRef ptr = LLVMBuildGEP2(builder, LLVMGetAllocatedType(indexable), indexable, indices, 2, "");
-
-	return LLVMBuildLoad2(builder, LLVMGetElementType(LLVMGetAllocatedType(indexable)), ptr, "");
+	LLVMValueRef item_pointer;
+	LLVMTypeRef item_type;
+	if (LLVMGetValueKind(indexable) == LLVMInstructionValueKind &&
+		LLVMGetInstructionOpcode(indexable) == LLVMAlloca) {
+		LLVMTypeRef allocated_type = LLVMGetAllocatedType(indexable);
+		if (LLVMGetTypeKind(allocated_type) == LLVMArrayTypeKind) {
+			item_type = LLVMGetElementType(allocated_type);
+			LLVMValueRef indices[2];
+			indices[0] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0);
+			indices[1] = index;
+			item_pointer = LLVMBuildGEP2(builder, allocated_type, indexable, indices, 2, "");
+		} else {
+			item_type = allocated_type;
+			LLVMValueRef indices[1] = { index };
+			item_pointer = LLVMBuildGEP2(builder, allocated_type, indexable, indices, 1, "");
+		}
+	} else {
+		LLVMTypeRef indexable_type = LLVMTypeOf(indexable);
+		// TODO: find item type
+		item_type = indexable_type;
+		LLVMValueRef indices[1] = { index };
+		item_pointer = LLVMBuildGEP2(builder, indexable_type, indexable, indices, 1, "");
+	}
+	return LLVMBuildLoad2(builder, item_type, item_pointer, "");
 }
 
 static LLVMValueRef parse_file_node(AstNode *node) {
@@ -443,7 +512,9 @@ void compiler_initialize(Table *modules_) {
 
 	global_scope.prev = NULL;
 	global_scope.locals = malloc(sizeof(Table));
+	global_scope.definitions = malloc(sizeof(Table));
     table_init(global_scope.locals);
+    table_init(global_scope.definitions);
 
     table_init(&types);
 	table_put(&types, "s1", LLVMInt8TypeInContext(context));

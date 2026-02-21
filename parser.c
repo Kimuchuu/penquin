@@ -450,15 +450,14 @@ static AstNode *parse_function(bool external) {
 			
 		Parameter parameter;
 		do {
-			if (current_token->type == TOKEN_TRIPLE_DOT) {
-				fn_node->as.fn.vararg = true;
-				current_token++;
-				break;
-			}
-			if (current_token->type != TOKEN_IDENTIFIER) {
+			parameter.rest = consume_if(TOKEN_TRIPLE_DOT);
+			if (current_token->type != TOKEN_IDENTIFIER && !parameter.rest) {
 				fprintf(stderr, "Epic fail, expected identifier (type) but got: %s.\n",
 						token_type_to_string(current_token->type));
 				exit(1);
+			} else if (current_token->type != TOKEN_IDENTIFIER) {
+				fn_node->as.fn.vararg = true;
+				break;
 			}
 			parameter.name.p = current_token->raw;
 			parameter.name.length = current_token->length;
@@ -475,7 +474,7 @@ static AstNode *parse_function(bool external) {
 			parameter.type.length = current_token->length;
 			current_token++;
 			list_add(&fn_node->as.fn.parameters, &parameter);
-		} while (consume_if(TOKEN_COMMA));
+		} while (!parameter.rest && consume_if(TOKEN_COMMA));
     } else {
 		fn_node->as.fn.parameters.length = 0;
     }
