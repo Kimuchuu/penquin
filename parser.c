@@ -178,7 +178,7 @@ static AstNode *create_operator() {
 static String escape_string(String original) {
 	char *str = malloc(original.length + 1);
 	char last = '\0';
-	char pos = 0;
+	int pos = 0;
 
 	for (int i = 0; i < original.length; i++) {
 		char current = original.p[i];
