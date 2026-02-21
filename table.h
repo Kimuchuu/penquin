@@ -2,9 +2,10 @@
 #define PENQUIN_TABLE_H
 
 #include <stddef.h>
+#include "common.h"
 
 typedef struct {
-    char *key;
+    String key;
     void *element;
 } TableEntry;
 
@@ -15,8 +16,8 @@ typedef struct {
 } Table;
 
 void table_init(Table *table);
-void table_put(Table *table, char *key, void *value);
-void *table_get(Table *table, char *key);
+void table_put(Table *table, String key, void *value);
+void *table_get(Table *table, String key);
 void **table_get_all(Table *table);
 
 #endif

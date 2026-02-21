@@ -17,12 +17,19 @@ char *cstring_duplicate(char *c) {
 	return res;
 }
 
-int String_cmp(String s, char *c) {
+int String_cmp_cstring(String s, char *c) {
 	int clen = strlen(c);
 	if (clen != s.length) {
 		return s.length - clen;
 	}
 	return strncmp(s.p, c, clen);
+}
+
+int String_cmp(String s1, String s2) {
+	if (s1.length != s2.length) {
+		return s1.length - s2.length;
+	}
+	return strncmp(s1.p, s2.p, s1.length);
 }
 
 String String_concat_cstring(String s, char *c) {

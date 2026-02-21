@@ -3,12 +3,11 @@
 #include <stdio.h>
 #include "table.h"
 
-static int hash(char *key, int max) {
-	unsigned int len = strlen(key);
+static int hash(String key, int max) {
 	unsigned int hash = 2166136261u;
-	for (int i = 0; i < len; i++) {
+	for (int i = 0; i < key.length; i++) {
 		hash = hash * 16777619u;
-		hash = hash ^ key[i];
+		hash = hash ^ key.p[i];
 	}
     return hash % max;
 }
@@ -19,7 +18,7 @@ void table_init(Table *table) {
     table->capacity = 0;
 }
 
-void table_put(Table *table, char *key, void *value) {
+void table_put(Table *table, String key, void *value) {
     if (table->length + 1 > table->capacity) {
 		if (table->capacity	> 0) {
 			// TODO we probably need to reposition everything since
@@ -43,11 +42,11 @@ void table_put(Table *table, char *key, void *value) {
     }
 
     int i = hash(key, table->capacity);
-	while (table->entries[i].key != NULL && strcmp(key, table->entries[i].key) != 0) {
+	while (table->entries[i].key.p != NULL && String_cmp(key, table->entries[i].key) != 0) {
 		i = (i + 1) % table->capacity;
 	}
 
-	if (table->entries[i].key == NULL) {
+	if (table->entries[i].key.p == NULL) {
 		table->length++;
 	}
 	
@@ -55,13 +54,13 @@ void table_put(Table *table, char *key, void *value) {
     table->entries[i].element = value;
 }
 
-void *table_get(Table *table, char *key) {
-    if (key == NULL || table->capacity == 0) {
+void *table_get(Table *table, String key) {
+    if (key.p == NULL || table->capacity == 0) {
         return NULL;
     }
     int i = hash(key, table->capacity);
 	int start_i = i;
-	while (table->entries[i].key == NULL || strcmp(table->entries[i].key, key) != 0) {
+	while (table->entries[i].key.p == NULL || String_cmp(table->entries[i].key, key) != 0) {
 		i = (i + 1) % table->capacity;
 		if (i == start_i) return NULL;
 	}
@@ -75,7 +74,7 @@ void **table_get_all(Table *table) {
 	}
 	void **all = malloc(sizeof(void *) * table->length);
 	for (int i = 0, n = 0; i < table->capacity; i++) {
-		if (table->entries[i].key != NULL) {
+		if (table->entries[i].key.p != NULL) {
 			all[n++] = table->entries[i].element;
 		}
 	}

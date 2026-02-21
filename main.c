@@ -37,7 +37,7 @@ void traverse_imports(Table *file_node_table, AstNode *file_node, char *dir) {
 			printf("import_dir: %s\n", import_dir);
 #endif
 
-			AstNode *import_module = table_get(file_node_table, import_path);
+			AstNode *import_module = table_get(file_node_table, STRING(import_path));
 			if (import_module != NULL) {
 				free(import_path);
 				free(import_dir);
@@ -48,7 +48,7 @@ void traverse_imports(Table *file_node_table, AstNode *file_node, char *dir) {
 
 			AstNode *module = build_file_node(import_path, buffer);
 
-			table_put(file_node_table, import_path, module);
+			table_put(file_node_table, STRING(import_path), module);
 			traverse_imports(file_node_table, module, import_dir);
 			free(import_dir);
 		}
