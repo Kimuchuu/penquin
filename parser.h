@@ -86,6 +86,10 @@ typedef struct {
 	struct AstNode *statement;
 } While;
 
+typedef struct {
+	Type type;
+} TypeInfo;
+
 typedef enum {
     AST_ACCESSOR,
     AST_ARRAY,
@@ -108,6 +112,7 @@ typedef enum {
 
 typedef struct AstNode {
     AstType type;
+    TypeInfo *type_info;
     union {
 		Binary       accessor;
 		Array        array;
