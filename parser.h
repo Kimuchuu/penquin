@@ -5,6 +5,31 @@
 #include "common.h"
 #include "list.h"
 #include "token.h"
+#include "table.h"
+
+typedef struct Scope {
+	struct Scope *prev;
+	Table *locals;
+	Table *definitions;
+} Scope;
+
+typedef enum {
+	TYPE_VALUE,
+	TYPE_ARRAY,
+	TYPE_POINTER,
+} TypeType;
+
+typedef struct TypeInfo {
+	TypeType type;
+	union {
+		struct {
+			struct TypeInfo *of;
+			int length;
+		} array;
+		struct TypeInfo *pointer_to;
+		String value_of;
+	};
+} TypeInfo;
 
 typedef struct {
 	List items;
@@ -13,10 +38,12 @@ typedef struct {
 typedef struct {
 	String name;
 	struct AstNode *value;
+	struct AstNode *initial;
 } Assignment;
 
 typedef struct {
 	List statements;
+	Scope *scope;
 } Block;
 
 typedef struct {
@@ -28,6 +55,7 @@ typedef struct {
 	char *path;
 	List tokens;
 	List nodes;
+	Scope *scope;
 } File;
 
 typedef struct {
@@ -37,9 +65,11 @@ typedef struct {
 	struct Type *type;
 	bool external;
 	bool vararg;
+	Scope *scope;
 } Function;
 
 typedef struct {
+	struct AstNode *function;
 	struct AstNode *variable;
 	List arguments;
 } FunctionCall;
@@ -52,6 +82,7 @@ typedef struct {
 
 typedef struct {
 	String path;
+	struct AstNode *file_node;
 } Import;
 
 typedef struct {
@@ -66,9 +97,8 @@ typedef struct {
 } Operator;
 
 typedef struct {
-	bool pointer;
 	bool rest;
-	String type;
+	TypeInfo type_info;
 	String name;
 } Parameter;
 
@@ -80,6 +110,11 @@ typedef struct Type {
 	bool pointer;
 	String name;
 } Type;
+
+typedef struct {
+	String name;
+	struct AstNode *declaration;
+} Variable;
 
 typedef struct {
 	struct AstNode *condition;
@@ -99,6 +134,7 @@ typedef enum {
     AST_ITEM_ACCESS,
     AST_NUMBER,
     AST_OPERATOR,
+    AST_PARAMETER,
     AST_RETURN,
     AST_STRING,
     AST_VARIABLE,
@@ -108,6 +144,8 @@ typedef enum {
 
 typedef struct AstNode {
     AstType type;
+    TypeInfo *type_info;
+    void *backend_ref;
     union {
 		Binary       accessor;
 		Array        array;
@@ -121,8 +159,10 @@ typedef struct AstNode {
 		ItemAccess   item_access;
         float        number;
 		Operator     operator_;
+        Parameter    parameter;
         Return       return_;
         String       string;
+		Variable     variable;
 		While        while_;
     } as;
 } AstNode;

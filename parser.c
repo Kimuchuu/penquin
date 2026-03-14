@@ -1,7 +1,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 
 #include "parser.h"
 #include "common.h"
@@ -14,6 +13,25 @@ AstNode *current_node;
 
 static AstNode *parse_expression();
 static AstNode *parse_statement();
+
+static void print_type_info(TypeInfo *type_info) {
+	switch (type_info->type) {
+		case TYPE_VALUE: {
+			DEFINE_CSTRING(str, type_info->value_of);
+			printf("%s", str);
+			break;
+		}
+		case TYPE_ARRAY:
+			printf("[");
+			print_type_info(type_info->array.of);
+			printf("]");
+			break;
+		case TYPE_POINTER:
+			printf("*");
+			print_type_info(type_info->pointer_to);
+			break;
+	}
+}
 
 static void print_tree(AstNode *node) {
     if (node == NULL) {
@@ -66,13 +84,10 @@ static void print_tree(AstNode *node) {
 			DEFINE_CSTRING(name, node->as.fn.name)
             printf("(fn:%s", name);
 			List *parameters = &node->as.fn.parameters;
-			Parameter parameter;
 			for (int i = 0; i < parameters->length; i++) {
-				parameter = LIST_GET(Parameter, parameters, i);
-				char str[parameter.type.length + 1];
-				str[parameter.type.length] = '\0';
-				memcpy(str, parameter.type.p, parameter.type.length);
-				printf(" %s", str);
+				AstNode *parameter_node = LIST_GET(AstNode *, parameters, i);
+				printf(" ");
+				print_tree(parameter_node);
 			}
             printf(")");
             break;
@@ -119,15 +134,22 @@ static void print_tree(AstNode *node) {
             print_tree(node->as.operator_.right);
             printf(")");
             break;
+        case AST_PARAMETER:
+			print_type_info(&node->as.parameter.type_info);
+            break;
 	    case AST_RETURN: {
             printf("(return ");
 			print_tree(node->as.return_.expression);
             printf(")");
             break;
 		}
-        case AST_STRING:
-        case AST_VARIABLE: {
+        case AST_STRING: {
 			DEFINE_CSTRING(str, node->as.string)
+            printf("%s", str);
+            break;
+        }
+        case AST_VARIABLE: {
+			DEFINE_CSTRING(str, node->as.variable.name)
             printf("%s", str);
             break;
         }
@@ -159,6 +181,8 @@ static char consume_if(TokenType type) {
 static inline AstNode *create_node(AstType type) {
     AstNode *node = malloc(sizeof(AstNode));
     node->type = type;
+	node->type_info = NULL;
+	node->backend_ref = NULL;
     return node;
 }
 
@@ -203,8 +227,9 @@ static AstNode *create_string() {
 
 static AstNode *create_variable() {
     AstNode *node = create_node(AST_VARIABLE);
-    node->as.string.p = current_token->raw;
-    node->as.string.length = current_token->length;
+    node->as.variable.name.p = current_token->raw;
+    node->as.variable.name.length = current_token->length;
+    node->as.variable.declaration = NULL;
     return node;
 }
 
@@ -347,8 +372,9 @@ static AstNode *parse_assignment() {
         assert(dst->type == AST_VARIABLE);
         AstNode *ass = create_node(AST_ASSIGNMENT);
         current_token++;
-        ass->as.assignment.name = dst->as.string;
+        ass->as.assignment.name = dst->as.variable.name;
         ass->as.assignment.value = parse_array();
+        ass->as.assignment.initial = NULL;
 		free(dst);
         dst = ass;
     }
@@ -416,6 +442,7 @@ static AstNode *parse_statement() {
 static AstNode *parse_block() {
 	consume(TOKEN_LEFT_BRACE);
 	AstNode *block_node = create_node(AST_BLOCK);
+	block_node->as.block.scope = NULL;
 	
 	list_init(&block_node->as.block.statements, sizeof(AstNode *));
 	while (current_token->type != TOKEN_RIGHT_BRACE && (current_token - (Token *)tokens->elements) < tokens->length) {
@@ -429,6 +456,7 @@ static AstNode *parse_block() {
 
 static AstNode *parse_function(bool external) {
 	AstNode *fn_node = create_node(AST_FUNCTION);
+	fn_node->as.fn.scope = NULL;
 	current_token++;
 	if (current_token->type != TOKEN_IDENTIFIER) {
 		fprintf(stderr, "Epic fail, expected identifier but got: %s.\n",
@@ -446,7 +474,7 @@ static AstNode *parse_function(bool external) {
 
 	// Parameters
 	if (current_token->type != TOKEN_RIGHT_PAREN) {
-		list_init(&fn_node->as.fn.parameters, sizeof(Parameter));
+		list_init(&fn_node->as.fn.parameters, sizeof(AstNode *));
 			
 		Parameter parameter;
 		do {
@@ -464,16 +492,36 @@ static AstNode *parse_function(bool external) {
 			current_token++;
 			consume(TOKEN_COLON);
 
-			parameter.pointer = consume_if(TOKEN_STAR);
+			bool pointer = consume_if(TOKEN_STAR);
 			if (current_token->type != TOKEN_IDENTIFIER) {
 				fprintf(stderr, "Epic fail, expected identifier (name) but got: %s.\n",
 						token_type_to_string(current_token->type));
 				exit(1);
 			}
-			parameter.type.p = current_token->raw;
-			parameter.type.length = current_token->length;
+
+			String type_name = { current_token->raw, current_token->length };
+
+			if ((pointer && !parameter.rest) || (!pointer && parameter.rest)) {
+				parameter.type_info.type = TYPE_POINTER;
+				parameter.type_info.pointer_to = malloc(sizeof(TypeInfo));
+				parameter.type_info.pointer_to->type = TYPE_VALUE;
+				parameter.type_info.pointer_to->value_of = type_name;
+			} else if (pointer) {
+				parameter.type_info.type = TYPE_POINTER;
+				parameter.type_info.pointer_to = malloc(sizeof(TypeInfo));
+				parameter.type_info.pointer_to->type = TYPE_POINTER;
+				parameter.type_info.pointer_to->pointer_to = malloc(sizeof(TypeInfo));
+				parameter.type_info.pointer_to->pointer_to->type = TYPE_VALUE;
+				parameter.type_info.pointer_to->pointer_to->value_of = type_name;
+			} else {
+				parameter.type_info.type = TYPE_VALUE;
+				parameter.type_info.value_of = type_name;
+			}
+			
 			current_token++;
-			list_add(&fn_node->as.fn.parameters, &parameter);
+			AstNode *parameter_node = create_node(AST_PARAMETER);
+			parameter_node->as.parameter = parameter;
+			list_add(&fn_node->as.fn.parameters, &parameter_node);
 		} while (!parameter.rest && consume_if(TOKEN_COMMA));
     } else {
 		fn_node->as.fn.parameters.length = 0;
@@ -529,6 +577,7 @@ static AstNode *parse_import() {
 	
     import_node->as.import.path.p = current_token->raw + 1;
     import_node->as.import.path.length = current_token->length - 2;
+    import_node->as.import.file_node = NULL;
 	current_token++;
 
 	return import_node;
@@ -565,6 +614,7 @@ void parse(List *t, List *nodes) {
 
 AstNode *parse_file(char *path, List *t) {
 	AstNode *file_node = create_node(AST_FILE);
+	file_node->as.file.scope = NULL;
 	file_node->as.file.path = path;
 	file_node->as.file.tokens = *t;
 	list_init(&file_node->as.file.nodes, sizeof(AstNode *));

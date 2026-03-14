@@ -6,7 +6,6 @@
 #include "table.h"
 #include "parser.h"
 
-char *resolve_module_path(char *dir, String module_name);
 LLVMModuleRef build_module(AstNode *file_node, char *dir, char *name, bool entry);
 void compile(LLVMModuleRef module, char *name);
 void compiler_initialize(Table *modules);

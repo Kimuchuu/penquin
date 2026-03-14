@@ -3,11 +3,14 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <llvm-c/Linker.h>
+#include <llvm-c/Analysis.h>
 #include "common.h"
 #include "table.h"
 #include "token.h"
 #include "parser.h"
 #include "codegen.h"
+#include "resolver.h"
+#include "typechecker.h"
 
 
 AstNode *build_file_node(char *path, char *buffer) {
@@ -50,6 +53,8 @@ void traverse_imports(Table *file_node_table, AstNode *file_node, char *dir) {
 
 			table_put(file_node_table, STRING(import_path), module);
 			traverse_imports(file_node_table, module, import_dir);
+			resolve(module, import_dir);
+			resolve_types(module);	
 			free(import_dir);
 		}
 	}
@@ -71,7 +76,11 @@ int main(int argc, char **argv) {
 
 	Table modules;
 	table_init(&modules);
+	resolver_initialize(&modules);
+
 	traverse_imports(&modules, main_file_node, dir);
+	resolve(main_file_node, dir);
+	resolve_types(main_file_node);
 
 	compiler_initialize(&modules);
 	LLVMModuleRef main_llvm_module = build_module(main_file_node, dir, name, true);
@@ -82,6 +91,7 @@ int main(int argc, char **argv) {
 		LLVMModuleRef llvm_module = build_module(file_node, dir, file_node->as.file.path, false);
 		LLVMLinkModules2(main_llvm_module, llvm_module);
 	}
+	LLVMVerifyModule(main_llvm_module, LLVMPrintMessageAction, NULL);
 	compile(main_llvm_module, "test");
 #ifdef DEBUG
 	printf("exec:\n\n");
