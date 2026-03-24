@@ -93,6 +93,7 @@ static LLVMValueRef parse_operator(AstNode *node) {
 	LLVMValueRef right = handle_rvalue(parse_node(node->as.operator_.right));
 
 	switch (node->as.operator_.type) {
+		// Aritmethic
 		case TOKEN_PLUS:
 			return LLVMBuildAdd(builder, left, right, "");
 		case TOKEN_MINUS:
@@ -101,6 +102,7 @@ static LLVMValueRef parse_operator(AstNode *node) {
 			return LLVMBuildMul(builder, left, right, "");
 		case TOKEN_SLASH:
 			return LLVMBuildSDiv(builder, left, right, "");
+		// Comparison
 		case TOKEN_DOUBLE_EQUAL:
 			return LLVMBuildICmp(builder, LLVMIntEQ, left, right, "");
 		case TOKEN_LESS_THAN:
@@ -111,6 +113,15 @@ static LLVMValueRef parse_operator(AstNode *node) {
 			return LLVMBuildICmp(builder, LLVMIntSGT, left, right, "");
 		case TOKEN_GREATER_THAN_OR_EQUAL:
 			return LLVMBuildICmp(builder, LLVMIntSGE, left, right, "");
+		// Logical
+		case TOKEN_LOGICAL_AND:
+			left = LLVMBuildIsNotNull(builder, left, "");
+			right = LLVMBuildIsNotNull(builder, right, "");
+			return LLVMBuildSelect(builder, left, right, left, "");
+		case TOKEN_LOGICAL_OR:
+			left = LLVMBuildIsNotNull(builder, left, "");
+			right = LLVMBuildIsNotNull(builder, right, "");
+			return LLVMBuildSelect(builder, left, left, right, "");
 		default:
 			report_invalid_node("Unexpected identifier in operator node");
 	}
@@ -320,6 +331,11 @@ static LLVMValueRef parse_block(AstNode *node) {
 	return value;
 }
 
+static LLVMValueRef parse_bool(AstNode *node) {
+    LLVMTypeRef bool_type = LLVMInt1TypeInContext(context);
+    return LLVMConstInt(bool_type, node->as.bool_, 1);
+}
+
 static LLVMValueRef parse_import(AstNode *node) {
 	AstNode *file_node = node->as.import.file_node;
 	List *import_file_nodes = &file_node->as.file.nodes;
@@ -417,6 +433,8 @@ static LLVMValueRef parse_node(AstNode *node) {
 			return parse_return(node);
 		case AST_BLOCK:
 			return parse_block(node);
+		case AST_BOOL:
+			return parse_bool(node);
 		case AST_IMPORT:
 			return parse_import(node);
 		case AST_ACCESSOR:

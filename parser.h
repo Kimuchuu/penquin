@@ -125,6 +125,7 @@ typedef enum {
     AST_ACCESSOR,
     AST_ARRAY,
     AST_ASSIGNMENT,
+    AST_BOOL,
     AST_BLOCK,
     AST_FILE,
     AST_FUNCTION,
@@ -151,6 +152,7 @@ typedef struct AstNode {
 		Array        array;
         Assignment   assignment;
 		Block        block;
+		bool         bool_;
 		FunctionCall call;
 		File         file;
 		Function     fn;

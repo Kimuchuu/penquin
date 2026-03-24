@@ -54,6 +54,9 @@ static void parse_block(AstNode *node) {
 	}
 }
 
+static void parse_bool(AstNode *node) {
+	node->type_info = value_of("bool");
+}
 
 static void parse_file_node(AstNode *node) {
 	for (int i = 0; i < node->as.file.nodes.length; i++) {
@@ -133,6 +136,10 @@ static void parse_operator(AstNode *node) {
 		case TOKEN_GREATER_THAN_OR_EQUAL:
 			node->type_info = value_of("bool");
 			break;
+		case TOKEN_LOGICAL_AND:
+		case TOKEN_LOGICAL_OR:
+			node->type_info = value_of("bool");
+			break;
 		default:
 			break;
 	}
@@ -173,6 +180,9 @@ static void parse_node(AstNode *node) {
 		case AST_BLOCK:
 			parse_block(node);
 			break;
+		case AST_BOOL:
+			parse_bool(node);
+			break;
 		case AST_FILE:
 			parse_file_node(node);
 			break;
@@ -194,7 +204,6 @@ static void parse_node(AstNode *node) {
 		case AST_NUMBER:
 			parse_number(node);
 			break;
-			parse_number(node);
 		case AST_OPERATOR:
 			parse_operator(node);
 			break;

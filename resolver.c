@@ -241,6 +241,8 @@ static void parse_node(AstNode *node) {
 		case AST_BLOCK:
 			parse_block(node);
 			break;
+		case AST_BOOL:
+			break;
 		case AST_FILE:
 			parse_file_node(node);
 			break;

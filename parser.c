@@ -72,6 +72,9 @@ static void print_tree(AstNode *node) {
         		}
             printf(")");
             break;
+        case AST_BOOL:
+            printf("%b", node->as.bool_);
+            break;
         case AST_FILE:
             printf("(%s\n", node->as.file.path);
 			List *nodes = &node->as.file.nodes;
@@ -193,6 +196,12 @@ static AstNode *create_number() {
     return node;
 }
 
+static AstNode *create_bool() {
+    AstNode *node = create_node(AST_BOOL);
+    node->as.bool_ = current_token->type == TOKEN_TRUE;
+    return node;
+}
+
 static AstNode *create_operator() {
     AstNode *node = create_node(AST_OPERATOR);
     node->as.operator_.type = current_token->type;
@@ -234,7 +243,11 @@ static AstNode *create_variable() {
 }
 
 static AstNode *parse_primary() {
-    if (current_token->type == TOKEN_NUMBER) {
+    if (current_token->type == TOKEN_TRUE || current_token->type == TOKEN_FALSE) {
+        AstNode *bool_ = create_bool();
+        current_token++;
+        return bool_;
+	} else if (current_token->type == TOKEN_NUMBER) {
         AstNode *number = create_number();
         current_token++;
         return number;
@@ -347,13 +360,37 @@ static AstNode *parse_comparison() {
     return term;
 }
 
+static AstNode *parse_logical_and() {
+    AstNode *comparison = parse_comparison();
+    while (current_token->type == TOKEN_LOGICAL_AND) {
+        AstNode *operator = create_operator();
+        current_token++;
+        operator->as.operator_.left = comparison;
+        operator->as.operator_.right = parse_comparison();
+		comparison = operator;
+	}
+    return comparison;
+}
+
+static AstNode *parse_logical_or() {
+    AstNode *logical_and = parse_logical_and();
+    while (current_token->type == TOKEN_LOGICAL_OR) {
+        AstNode *operator = create_operator();
+        current_token++;
+        operator->as.operator_.left = logical_and;
+        operator->as.operator_.right = parse_logical_and();
+		logical_and = operator;
+	}
+    return logical_and;
+}
+
 static AstNode *parse_array() {
     if (current_token->type == TOKEN_LEFT_BRACKET) {
 		current_token++;
 		AstNode *node = create_node(AST_ARRAY);
 		list_init(&node->as.array.items, sizeof(AstNode *));
 		while (current_token->type != TOKEN_RIGHT_BRACKET && (current_token - (Token *)tokens->elements) < tokens->length) {
-			AstNode *expr = parse_comparison();
+			AstNode *expr = parse_logical_or();
 			list_add(&node->as.array.items, &expr);
 			if (!consume_if(TOKEN_COMMA)) {
 				break;
@@ -363,7 +400,7 @@ static AstNode *parse_array() {
 		return node;
 	}
 
-	return parse_comparison();
+	return parse_logical_or();
 }
 
 static AstNode *parse_assignment() {

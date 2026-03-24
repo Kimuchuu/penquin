@@ -32,6 +32,7 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(EQUAL);
         CASE_TOKEN(ERROR);
         CASE_TOKEN(EXTERN);
+    	CASE_TOKEN(FALSE);
     	CASE_TOKEN(FUN);
         CASE_TOKEN(GREATER_THAN);
         CASE_TOKEN(GREATER_THAN_OR_EQUAL);
@@ -43,6 +44,8 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(LEFT_PAREN);
         CASE_TOKEN(LESS_THAN);
         CASE_TOKEN(LESS_THAN_OR_EQUAL);
+        CASE_TOKEN(LOGICAL_AND);
+        CASE_TOKEN(LOGICAL_OR);
         CASE_TOKEN(MINUS);
         CASE_TOKEN(NUMBER);
         CASE_TOKEN(PERCENT);
@@ -56,6 +59,7 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(STAR);
         CASE_TOKEN(STRING);
         CASE_TOKEN(TRIPLE_DOT);
+        CASE_TOKEN(TRUE);
     	CASE_TOKEN(WHILE);
         default: return "INVALID";
     }
@@ -124,6 +128,10 @@ static void scan_token() {
 			token.type = TOKEN_FUN;
 		} else if (len == 4 && strncmp(token.raw, "else", 4) == 0) {
 			token.type = TOKEN_ELSE;
+		} else if (len == 4 && strncmp(token.raw, "true", 4) == 0) {
+			token.type = TOKEN_TRUE;
+		} else if (len == 5 && strncmp(token.raw, "false", 5) == 0) {
+			token.type = TOKEN_FALSE;
 		} else if (len == 5 && strncmp(token.raw, "while", 5) == 0) {
 			token.type = TOKEN_WHILE;
 		} else if (len == 6 && strncmp(token.raw, "extern", 6) == 0) {
@@ -185,6 +193,22 @@ static void scan_token() {
 				token.type = TOKEN_DOUBLE_EQUAL;
 			} else {
 				token.type = TOKEN_EQUAL;
+			}
+            break;
+        case '&':
+			if (token.raw[1] == '&') {
+				scanner.current++;
+				token.type = TOKEN_LOGICAL_AND;
+			} else {
+				token.type = TOKEN_ERROR;
+			}
+            break;
+        case '|':
+			if (token.raw[1] == '|') {
+				scanner.current++;
+				token.type = TOKEN_LOGICAL_OR;
+			} else {
+				token.type = TOKEN_ERROR;
 			}
             break;
         case '+':
