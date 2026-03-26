@@ -116,9 +116,13 @@ static void parse_assignment(AstNode *node) {
 		char *name = resolve_identifier(node->as.assignment.name, current_scope->locals != global_scope.locals);
 		table_put(current_scope->locals, STRING(name), node);
 		declaration_node = node;
+	} else {
+		assert(declaration_node->as.assignment.type_info == NULL);
 	}
 	node->as.assignment.initial = declaration_node;
-	parse_node(node->as.assignment.value);
+	if (node->as.assignment.value != NULL) {
+		parse_node(node->as.assignment.value);
+	}
 }
 
 static void parse_block(AstNode *node) {

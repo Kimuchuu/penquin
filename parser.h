@@ -39,6 +39,7 @@ typedef struct {
 	String name;
 	struct AstNode *value;
 	struct AstNode *initial;
+	TypeInfo *type_info;
 } Assignment;
 
 typedef struct {

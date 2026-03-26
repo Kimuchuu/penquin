@@ -41,9 +41,15 @@ static char *resolve_identifier(String name, bool external) {
 static LLVMValueRef handle_rvalue(LLVMValueRef rvalue) {
 	LLVMValueKind kind = LLVMGetValueKind(rvalue);
 	if (kind == LLVMInstructionValueKind && LLVMGetInstructionOpcode(rvalue) == LLVMAlloca) {
+		LLVMTypeRef allocated_type = LLVMGetAllocatedType(rvalue);
+		LLVMTypeKind allocated_kind = LLVMGetTypeKind(allocated_type);
+		if (allocated_kind == LLVMArrayTypeKind) {
+			return rvalue;
+		}
+
 		return LLVMBuildLoad2(
 			builder,
-			LLVMGetAllocatedType(rvalue),
+			allocated_type,
 			rvalue,
 			""
 		);
@@ -137,7 +143,11 @@ static LLVMValueRef parse_variable(AstNode *node) {
 static LLVMValueRef parse_assignment(AstNode *node) {
 	if (node == node->as.assignment.initial) {
 		char *name = String_to_cstring(node->as.assignment.name);
-		node->backend_ref = LLVMBuildAlloca(builder, parse_type(node->as.assignment.value->type_info), name);
+		node->backend_ref = LLVMBuildAlloca(builder, parse_type(node->type_info), name);
+	}
+
+	if (node->as.assignment.value == NULL) {
+		return node->as.assignment.initial->backend_ref;
 	}
 
 	LLVMValueRef value_node = handle_rvalue(parse_node(node->as.assignment.value));

@@ -256,6 +256,42 @@ static AstNode *create_variable() {
     return node;
 }
 
+static TypeInfo *parse_type() {
+	TypeInfo *type_info = malloc(sizeof(TypeInfo));
+	if (current_token->type == TOKEN_STAR) {
+		current_token++;
+		type_info->type = TYPE_POINTER;
+		type_info->pointer_to = parse_type();
+	} else if (current_token->type == TOKEN_IDENTIFIER) {
+		String type_name = { current_token->raw, current_token->length };
+		current_token++;
+		type_info->type = TYPE_VALUE;
+		type_info->value_of = type_name;
+		if (current_token->type == TOKEN_LEFT_BRACKET) {
+			current_token++;
+			// TODO: improve validation
+			if (current_token->type != TOKEN_NUMBER) {
+				fprintf(stderr, "Epic fail, expected number in array type but got: %s.\n",
+						token_type_to_string(current_token->type));
+			}
+			int n = strtol(current_token->raw, NULL, 10);
+			current_token++;
+
+			TypeInfo *array_type_info = malloc(sizeof(TypeInfo));
+			array_type_info->type = TYPE_ARRAY;
+			array_type_info->array.length = n;
+			array_type_info->array.of = type_info;
+			type_info = array_type_info;
+			consume(TOKEN_RIGHT_BRACKET);
+		}
+	} else {
+		fprintf(stderr, "Epic fail, expected star or identifier but got: %s.\n",
+				token_type_to_string(current_token->type));
+		exit(1);
+	}
+	return type_info;
+}
+
 static AstNode *parse_primary() {
     if (current_token->type == TOKEN_TRUE || current_token->type == TOKEN_FALSE) {
         AstNode *bool_ = create_bool();
@@ -420,13 +456,27 @@ static AstNode *parse_array() {
 
 static AstNode *parse_assignment() {
     AstNode *dst = parse_array();
-    if (current_token->type == TOKEN_EQUAL) {
+
+	TypeInfo *type_info = NULL;
+	if (current_token->type == TOKEN_COLON) {
+		assert(dst->type == AST_VARIABLE);
+		current_token++;
+		type_info = parse_type();
+	}
+
+	bool explicit_assignment = current_token->type == TOKEN_EQUAL;
+	if (explicit_assignment || type_info != NULL) {
         assert(dst->type == AST_VARIABLE);
         AstNode *ass = create_node(AST_ASSIGNMENT);
-        current_token++;
         ass->as.assignment.name = dst->as.variable.name;
-        ass->as.assignment.value = parse_array();
+		if (explicit_assignment) {
+			current_token++;
+			ass->as.assignment.value = parse_array();
+		} else {
+			ass->as.assignment.value = NULL;
+		}
         ass->as.assignment.initial = NULL;
+        ass->as.assignment.type_info = type_info;
 		free(dst);
         dst = ass;
     }
@@ -544,33 +594,15 @@ static AstNode *parse_function(bool external) {
 			current_token++;
 			consume(TOKEN_COLON);
 
-			bool pointer = consume_if(TOKEN_STAR);
-			if (current_token->type != TOKEN_IDENTIFIER) {
-				fprintf(stderr, "Epic fail, expected identifier (name) but got: %s.\n",
-						token_type_to_string(current_token->type));
-				exit(1);
-			}
-
-			String type_name = { current_token->raw, current_token->length };
-
-			if ((pointer && !parameter.rest) || (!pointer && parameter.rest)) {
+			TypeInfo *type_info = parse_type();
+			if (parameter.rest) {
 				parameter.type_info.type = TYPE_POINTER;
-				parameter.type_info.pointer_to = malloc(sizeof(TypeInfo));
-				parameter.type_info.pointer_to->type = TYPE_VALUE;
-				parameter.type_info.pointer_to->value_of = type_name;
-			} else if (pointer) {
-				parameter.type_info.type = TYPE_POINTER;
-				parameter.type_info.pointer_to = malloc(sizeof(TypeInfo));
-				parameter.type_info.pointer_to->type = TYPE_POINTER;
-				parameter.type_info.pointer_to->pointer_to = malloc(sizeof(TypeInfo));
-				parameter.type_info.pointer_to->pointer_to->type = TYPE_VALUE;
-				parameter.type_info.pointer_to->pointer_to->value_of = type_name;
+				parameter.type_info.pointer_to = type_info;
 			} else {
-				parameter.type_info.type = TYPE_VALUE;
-				parameter.type_info.value_of = type_name;
+				parameter.type_info = *type_info;
+				free(type_info);
 			}
 			
-			current_token++;
 			AstNode *parameter_node = create_node(AST_PARAMETER);
 			parameter_node->as.parameter = parameter;
 			list_add(&fn_node->as.fn.parameters, &parameter_node);
@@ -611,6 +643,7 @@ static AstNode *parse_function(bool external) {
 		consume(TOKEN_RIGHT_BRACE);
 	} else {
 		fn_node->as.fn.statements.elements = NULL;
+		fn_node->as.fn.statements.length = 0;
 		consume(TOKEN_SEMICOLON);
 	}
 

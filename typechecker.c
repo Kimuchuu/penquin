@@ -42,9 +42,20 @@ static void parse_array(AstNode *node) {
 }
 
 static void parse_assignment(AstNode *node) {
-	parse_node(node->as.assignment.value);
-	node->type_info = node->as.assignment.value->type_info;
-	// TODO: fail if reassigning with another, incompatible type
+	if (node->as.assignment.type_info != NULL) {
+		assert(node->as.assignment.initial == node);
+		node->type_info = node->as.assignment.type_info;
+	}
+	if (node->as.assignment.value != NULL) {
+		parse_node(node->as.assignment.value);
+		if (node->as.assignment.type_info != NULL) {
+			// TODO: fail if mismatch between specified type and value
+		}
+		if (node->as.assignment.initial != node) {
+			// TODO: fail if reassigning with another, incompatible type
+		}
+		node->type_info = node->as.assignment.value->type_info;
+	}
 }
 
 static void parse_block(AstNode *node) {
