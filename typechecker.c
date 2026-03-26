@@ -134,6 +134,7 @@ static void parse_operator(AstNode *node) {
 		case TOKEN_LESS_THAN_OR_EQUAL:
 		case TOKEN_GREATER_THAN:
 		case TOKEN_GREATER_THAN_OR_EQUAL:
+		case TOKEN_NOT_EQUAL:
 			node->type_info = value_of("bool");
 			break;
 		case TOKEN_LOGICAL_AND:

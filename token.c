@@ -47,6 +47,7 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(LOGICAL_AND);
         CASE_TOKEN(LOGICAL_OR);
         CASE_TOKEN(MINUS);
+        CASE_TOKEN(NOT_EQUAL);
         CASE_TOKEN(NUMBER);
         CASE_TOKEN(PERCENT);
         CASE_TOKEN(PLUS);
@@ -185,6 +186,14 @@ static void scan_token() {
 				token.type = TOKEN_TRIPLE_DOT;
 			} else {
 				token.type = TOKEN_DOT;
+			}
+            break;
+        case '!':
+			if (token.raw[1] == '=') {
+				scanner.current++;
+				token.type = TOKEN_NOT_EQUAL;
+			} else {
+				token.type = TOKEN_ERROR;
 			}
             break;
         case '=':

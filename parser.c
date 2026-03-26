@@ -350,7 +350,8 @@ static AstNode *parse_comparison() {
 		current_token->type == TOKEN_GREATER_THAN || 
 		current_token->type == TOKEN_GREATER_THAN_OR_EQUAL ||
 		current_token->type == TOKEN_LESS_THAN ||
-		current_token->type == TOKEN_LESS_THAN_OR_EQUAL) {
+		current_token->type == TOKEN_LESS_THAN_OR_EQUAL ||
+		current_token->type == TOKEN_NOT_EQUAL) {
         AstNode *operator = create_operator();
         current_token++;
         operator->as.operator_.left = term;

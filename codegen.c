@@ -113,6 +113,8 @@ static LLVMValueRef parse_operator(AstNode *node) {
 			return LLVMBuildICmp(builder, LLVMIntSGT, left, right, "");
 		case TOKEN_GREATER_THAN_OR_EQUAL:
 			return LLVMBuildICmp(builder, LLVMIntSGE, left, right, "");
+		case TOKEN_NOT_EQUAL:
+			return LLVMBuildICmp(builder, LLVMIntNE, left, right, "");
 		// Logical
 		case TOKEN_LOGICAL_AND:
 			left = LLVMBuildIsNotNull(builder, left, "");
