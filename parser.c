@@ -33,17 +33,15 @@ static void print_type_info(TypeInfo *type_info) {
 	}
 }
 
-static void print_tree(AstNode *node) {
+static void print_tree(AstNode *node, int level) {
     if (node == NULL) {
         return;
     }
     switch (node->type) {
         case AST_ACCESSOR:
-            printf("(");
-            print_tree(node->as.accessor.left);
+            print_tree(node->as.accessor.left, level);
             printf("::");
-            print_tree(node->as.accessor.right);
-            printf(")");
+            print_tree(node->as.accessor.right, level);
             break;
         case AST_ARRAY:
             printf("[");
@@ -51,26 +49,27 @@ static void print_tree(AstNode *node) {
 			AstNode *item;
 			for (int i = 0; i < items->length; i++) {
 				item = LIST_GET(AstNode *, items, i);
-				print_tree(item);
+				print_tree(item, level);
 			}
             printf("]");
             break;
 	    case AST_ASSIGNMENT: {
 			DEFINE_CSTRING(name, node->as.assignment.name)
             printf("(%s = ", name);
-            print_tree(node->as.assignment.value);
+            print_tree(node->as.assignment.value, level);
             printf(")");
             break;
 		}
         case AST_BLOCK:
             printf("(");
-        		List *statements = &node->as.block.statements;
-        		AstNode *statement;
-        		for (int i = 0; i < statements->length; i++) {
-        				statement = LIST_GET(AstNode *, statements, i);
-        				print_tree(statement);
-        		}
-            printf(")");
+			List *statements = &node->as.block.statements;
+			AstNode *statement;
+			for (int i = 0; i < statements->length; i++) {
+				printf("\n%*c", level + 2, ' ');
+				statement = LIST_GET(AstNode *, statements, i);
+				print_tree(statement, level + 2);
+			}
+			printf(")");
             break;
         case AST_BOOL:
             printf("%b", node->as.bool_);
@@ -79,7 +78,7 @@ static void print_tree(AstNode *node) {
             printf("(%s\n", node->as.file.path);
 			List *nodes = &node->as.file.nodes;
 			for (int i = 0; i < nodes->length; i++) {
-				print_tree(LIST_GET(AstNode *, nodes, i));
+				print_tree(LIST_GET(AstNode *, nodes, i), level);
 			}
             printf(")");
             break;
@@ -90,36 +89,44 @@ static void print_tree(AstNode *node) {
 			for (int i = 0; i < parameters->length; i++) {
 				AstNode *parameter_node = LIST_GET(AstNode *, parameters, i);
 				printf(" ");
-				print_tree(parameter_node);
+				print_tree(parameter_node, level);
+			}
+			if (node->as.fn.statements.elements != NULL) {
+				List *statements = &node->as.fn.statements;
+				for (int i = 0; i < statements->length; i++) {
+					printf("\n%*c", level + 2, ' ');
+					AstNode *statement_node = LIST_GET(AstNode *, statements, i);
+					print_tree(statement_node, level + 2);
+				}
 			}
             printf(")");
             break;
 		}
         case AST_FUNCTION_CALL:
             printf("(");
-            print_tree(node->as.call.variable);
+            print_tree(node->as.call.variable, level);
 			List *arguments = &node->as.call.arguments;
 			for (int i = 0; i < arguments->length; i++) {
 				printf(" ");
-				print_tree(LIST_GET(AstNode *, arguments, i));
+				print_tree(LIST_GET(AstNode *, arguments, i), level);
 			}
             printf(")");
             break;
         case AST_IF:
             printf("(if ");
-            print_tree(node->as.if_.condition);
+            print_tree(node->as.if_.condition, level);
 			printf("then ");
-            print_tree(node->as.if_.statement);
+            print_tree(node->as.if_.statement, level);
 			if (node->as.if_.else_statement != NULL) {
 				printf("else ");
-				print_tree(node->as.if_.else_statement);
+				print_tree(node->as.if_.else_statement, level);
 			}
             printf(")");
             break;
 		case AST_ITEM_ACCESS:
-			print_tree(node->as.item_access.indexable);
+			print_tree(node->as.item_access.indexable, level);
 			printf("[");
-			print_tree(node->as.item_access.index);
+			print_tree(node->as.item_access.index, level);
 			printf("]");
 			break;
 	    case AST_IMPORT: {
@@ -132,9 +139,9 @@ static void print_tree(AstNode *node) {
             break;
         case AST_OPERATOR:
             printf("(");
-            print_tree(node->as.operator_.left);
-            printf(" %c ", node->as.operator_.type);
-            print_tree(node->as.operator_.right);
+            print_tree(node->as.operator_.left, level);
+            printf(" %s ", token_type_to_string(node->as.operator_.type));
+            print_tree(node->as.operator_.right, level);
             printf(")");
             break;
         case AST_PARAMETER:
@@ -142,12 +149,18 @@ static void print_tree(AstNode *node) {
             break;
 	    case AST_RETURN: {
             printf("(return ");
-			print_tree(node->as.return_.expression);
+			print_tree(node->as.return_.expression, level);
             printf(")");
             break;
 		}
         case AST_STRING: {
 			DEFINE_CSTRING(str, node->as.string)
+			// Disable wrapping
+			for (int i = 0; i < node->as.string.length; i++) {
+				if (str[i] == '\n') {
+					str[i] = '\\';
+				}
+			}
             printf("%s", str);
             break;
         }
@@ -158,8 +171,9 @@ static void print_tree(AstNode *node) {
         }
         case AST_WHILE:
             printf("(while ");
-            print_tree(node->as.while_.statement);
-            print_tree(node->as.while_.condition);
+            print_tree(node->as.while_.condition, level);
+            printf(" ");
+            print_tree(node->as.while_.statement, level);
             printf(")");
             break;
     }
@@ -643,7 +657,7 @@ void parse(List *t, List *nodes) {
     while (current_token->type != TOKEN_EOF && (current_token - (Token *)tokens->elements) < tokens->length) {
         expression = parse_declaration();
 #ifdef DEBUG
-        print_tree(expression);
+        print_tree(expression, 0);
     	putchar('\n');
 #endif
     	list_add(nodes, &expression);
