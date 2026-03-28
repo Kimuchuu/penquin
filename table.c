@@ -18,29 +18,7 @@ void table_init(Table *table) {
     table->capacity = 0;
 }
 
-void table_put(Table *table, String key, void *value) {
-    if (table->length + 1 > table->capacity) {
-		if (table->capacity	> 0) {
-			// TODO we probably need to reposition everything since
-			// hash function would return different value
-			fprintf(stderr, "Exceeded max table capacity. Full rebuild required.\n");
-			exit(1);
-		}
-	  
-        int capacity = table->capacity == 0 ? 8 : table->capacity * 2;
-        TableEntry *mem = (TableEntry *)realloc(table->entries, capacity * sizeof(TableEntry));
-        if (mem == NULL) {
-            fprintf(stderr, "Unable to allocate memory for table\n");
-            exit(1);
-        }
-
-        // Zero out the newly allocated space
-        memset(mem + table->capacity, 0, (capacity - table->capacity) * sizeof(TableEntry));
-
-        table->capacity = capacity;
-        table->entries = mem;
-    }
-
+void static table_put_inner(Table *table, String key, void *value) {
     int i = hash(key, table->capacity);
 	while (table->entries[i].key.p != NULL && String_cmp(key, table->entries[i].key) != 0) {
 		i = (i + 1) % table->capacity;
@@ -52,6 +30,33 @@ void table_put(Table *table, String key, void *value) {
 	
     table->entries[i].key = key;
     table->entries[i].element = value;
+}
+
+void table_put(Table *table, String key, void *value) {
+    if (table->length + 1 > table->capacity) {
+        int capacity = table->capacity == 0 ? 8 : table->capacity * 2;
+        TableEntry *entries = (TableEntry *)calloc(capacity, sizeof(TableEntry));
+        if (entries == NULL) {
+            fprintf(stderr, "Unable to allocate memory for table\n");
+            exit(1);
+        }
+
+		int old_capacity = table->capacity;
+		TableEntry *old_entries = table->entries;
+
+        table->capacity = capacity;
+        table->entries = entries;
+
+		if (old_capacity != 0) {
+			for (int i = 0; i < old_capacity; i++) {
+				TableEntry old_entry = old_entries[i];
+				table_put_inner(table, old_entry.key, old_entry.element);
+			}
+			free(old_entries);
+		}
+    }
+
+	table_put_inner(table, key, value);
 }
 
 void *table_get(Table *table, String key) {
