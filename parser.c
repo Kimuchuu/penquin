@@ -454,8 +454,12 @@ static AstNode *parse_array() {
 	return parse_logical_or();
 }
 
-static AstNode *parse_assignment() {
-    AstNode *dst = parse_array();
+static AstNode *parse_expression() {
+	return parse_array();
+}
+
+static AstNode *parse_assignment_or_expression_statement() {
+    AstNode *dst = parse_expression();
 
 	TypeInfo *type_info = NULL;
 	if (current_token->type == TOKEN_COLON) {
@@ -471,7 +475,7 @@ static AstNode *parse_assignment() {
         ass->as.assignment.name = dst->as.variable.name;
 		if (explicit_assignment) {
 			current_token++;
-			ass->as.assignment.value = parse_array();
+			ass->as.assignment.value = parse_expression();
 		} else {
 			ass->as.assignment.value = NULL;
 		}
@@ -480,23 +484,17 @@ static AstNode *parse_assignment() {
 		free(dst);
         dst = ass;
     }
+
+	consume(TOKEN_SEMICOLON);
+
     return dst;
-}
-
-static AstNode *parse_expression() {
-    return parse_assignment();
-}
-
-static AstNode *parse_expression_statement() {
-    AstNode *expression = parse_expression();
-    consume(TOKEN_SEMICOLON);
-    return expression;
 }
 
 static AstNode *parse_return_statement() {
 	AstNode *return_node = create_node(AST_RETURN);
 	current_token++;
-	return_node->as.return_.expression = parse_expression_statement();
+	return_node->as.return_.expression = parse_expression();
+    consume(TOKEN_SEMICOLON);
 	return return_node;
 }
 
@@ -537,7 +535,7 @@ static AstNode *parse_statement() {
 	case TOKEN_LEFT_BRACE:
 		return parse_block();
 	default:
-		return parse_expression_statement();
+		return parse_assignment_or_expression_statement();
 	}
 }
 

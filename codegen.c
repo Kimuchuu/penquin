@@ -152,7 +152,7 @@ static LLVMValueRef parse_assignment(AstNode *node) {
 
 	LLVMValueRef value_node = handle_rvalue(parse_node(node->as.assignment.value));
 	LLVMBuildStore(builder, value_node, node->as.assignment.initial->backend_ref);
-	return value_node;
+	return NULL;
 }
 
 static LLVMValueRef parse_function_call(AstNode *node) {
