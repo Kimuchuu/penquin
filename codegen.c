@@ -470,6 +470,13 @@ void compiler_initialize(Table *modules_) {
 	table_put(&types, STRING("s2"), LLVMInt16TypeInContext(context));
 	table_put(&types, STRING("s4"), LLVMInt32TypeInContext(context));
 	table_put(&types, STRING("s8"), LLVMInt64TypeInContext(context));
+
+	LLVMTypeRef	string_type = LLVMStructCreateNamed(context, "string");
+	LLVMTypeRef string_elements[2];
+	string_elements[0] = table_get(&types, STRING("s4"));
+	string_elements[1] = LLVMPointerType(table_get(&types, STRING("s1")), 0);
+	LLVMStructSetBody(string_type, string_elements, 2, false);
+	table_put(&types, STRING("string"), string_type);
 }
 
 LLVMModuleRef build_module(AstNode *file_node, char *dir, char *name, bool entry) {
