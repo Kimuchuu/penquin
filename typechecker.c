@@ -133,6 +133,8 @@ static void parse_operator(AstNode *node) {
 	parse_node(node->as.operator_.left);
 	parse_node(node->as.operator_.right);
 
+	assert(node->as.operator_.left->type_info->type == node->as.operator_.right->type_info->type);
+
 	switch (node->as.operator_.type) {
 		case TOKEN_PLUS:
 		case TOKEN_MINUS:

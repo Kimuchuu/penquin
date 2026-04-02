@@ -94,9 +94,54 @@ static LLVMValueRef parse_string(AstNode *node) {
 	return LLVMBuildGlobalString(builder, cstring, "");
 }
 
+static int score_value_type(TypeInfo *type) {
+	if (String_cmp_cstring(type->value_of, "bool")) {
+		return 1;
+	} else if (String_cmp_cstring(type->value_of, "s1")) {
+		return 2;
+	} else if (String_cmp_cstring(type->value_of, "s2")) {
+		return 3;
+	} else if (String_cmp_cstring(type->value_of, "s4")) {
+		return 4;
+	} else if (String_cmp_cstring(type->value_of, "s8")) {
+		return 5;
+	} else {
+		char *type_name = String_to_cstring(type->value_of);
+		fprintf(stderr, "Cannot score type: %s\n", type_name);
+		exit(1);
+	}
+}
+
+static TypeInfo *deduce_type(AstNode *left, AstNode *right) {
+	assert(left->type_info->type == TYPE_VALUE &&
+		   left->type_info->type == right->type_info->type);
+	if (score_value_type(left->type_info) > score_value_type(right->type_info)) {
+		return left->type_info;
+	}
+	return right->type_info;
+}
+
 static LLVMValueRef parse_operator(AstNode *node) {
 	LLVMValueRef left = handle_rvalue(parse_node(node->as.operator_.left));
 	LLVMValueRef right = handle_rvalue(parse_node(node->as.operator_.right));
+
+	if (node->as.operator_.type == TOKEN_PLUS ||
+		node->as.operator_.type == TOKEN_MINUS ||
+		node->as.operator_.type == TOKEN_STAR ||
+		node->as.operator_.type == TOKEN_SLASH ||
+		node->as.operator_.type == TOKEN_DOUBLE_EQUAL ||
+		node->as.operator_.type == TOKEN_LESS_THAN ||
+		node->as.operator_.type == TOKEN_LESS_THAN_OR_EQUAL ||
+		node->as.operator_.type == TOKEN_GREATER_THAN ||
+		node->as.operator_.type == TOKEN_GREATER_THAN_OR_EQUAL ||
+		node->as.operator_.type == TOKEN_NOT_EQUAL) {
+		TypeInfo *type = deduce_type(node->as.operator_.left, node->as.operator_.right);
+		if (String_cmp(node->as.operator_.left->type_info->value_of, type->value_of) != 0) {
+			left = LLVMBuildCast(builder, LLVMSExt, left, parse_type(type), "");
+		} else if (String_cmp(node->as.operator_.right->type_info->value_of, type->value_of) != 0) {
+			right = LLVMBuildCast(builder, LLVMSExt, right, parse_type(type), "");
+		}
+	}
 
 	switch (node->as.operator_.type) {
 		// Aritmethic
