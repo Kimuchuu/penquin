@@ -248,7 +248,6 @@ static LLVMValueRef parse_function(AstNode *node) {
 		LLVMBasicBlockRef block = LLVMAppendBasicBlockInContext(context, fn, "");
 		LLVMPositionBuilderAtEnd(builder, block);
 
-
 		for (int i = 0; i < node->as.fn.parameters.length; i++) {
 			AstNode *parameter_node = LIST_GET(AstNode *, &node->as.fn.parameters, i);
 			LLVMValueRef param_value = LLVMGetParam(fn, i);
@@ -261,7 +260,6 @@ static LLVMValueRef parse_function(AstNode *node) {
 		for (int i = 0; i < node->as.fn.statements.length; i++) {
 			parse_node(LIST_GET(AstNode *, &node->as.fn.statements, i));
 		}
-		LLVMPositionBuilderAtEnd(builder, block);
 	}
 
 	if (node->as.fn.type == NULL &&
