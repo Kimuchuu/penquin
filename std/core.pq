@@ -6,7 +6,7 @@ fun print(str: *s1) {
 	puts(str);
 }
 
-fun print_format(str: *s1, ...rest: s4) {
+fun print_format(str: *s1, ...rest: any) {
 	rest_i = 0;
 	i = 0;
 	c = str[i];
@@ -14,11 +14,15 @@ fun print_format(str: *s1, ...rest: s4) {
 		if c == 37 {
 			if str[i + 1] == 100 {
 				i = i + 1;
-				printf("%d", rest[rest_i]);
+				match rest[rest_i] {
+					s4 d -> printf("%d", d)
+				};
 				rest_i = rest_i + 1;
 			} else if str[i + 1] == 115 {
 				i = i + 1;
-				printf("%s", rest[rest_i]);
+				match rest[rest_i] {
+					*s1 s -> printf("%s", s)
+				};
 				rest_i = rest_i + 1;
 			} else putchar(c);
 		} else putchar(c);

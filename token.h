@@ -4,6 +4,7 @@
 #include "list.h"
 
 typedef enum {
+    TOKEN_ARROW,
     TOKEN_COLON,
     TOKEN_COMMA,
     TOKEN_DOT,
@@ -28,6 +29,7 @@ typedef enum {
     TOKEN_LESS_THAN_OR_EQUAL,
     TOKEN_LOGICAL_AND,
     TOKEN_LOGICAL_OR,
+    TOKEN_MATCH,
     TOKEN_MINUS,
     TOKEN_NOT_EQUAL,
     TOKEN_NUMBER,

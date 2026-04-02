@@ -33,7 +33,7 @@ if this {
 
 }
 
-u4 ok = match x with {
+u4 ok = match x {
 	i8 i -> my_function()
 	u4 i -> 42 + i
 }

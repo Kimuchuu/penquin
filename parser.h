@@ -92,6 +92,17 @@ typedef struct {
 } ItemAccess;
 
 typedef struct {
+	TypeInfo *type_info;
+	struct AstNode *identifier;
+	struct AstNode *expression;
+} MatchBranch;
+
+typedef struct {
+	struct AstNode *matcher;
+	List branches;
+} Match;
+
+typedef struct {
 	TokenType type;
 	struct AstNode *left;
 	struct AstNode *right;
@@ -134,6 +145,7 @@ typedef enum {
     AST_IF,
     AST_IMPORT,
     AST_ITEM_ACCESS,
+    AST_MATCH,
     AST_NUMBER,
     AST_OPERATOR,
     AST_PARAMETER,
@@ -161,6 +173,7 @@ typedef struct AstNode {
 		Import       import;
 		ItemAccess   item_access;
         float        number;
+		Match        match;
 		Operator     operator_;
         Parameter    parameter;
         Return       return_;

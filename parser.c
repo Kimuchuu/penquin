@@ -134,6 +134,23 @@ static void print_tree(AstNode *node, int level) {
             printf("(import %s)", path);
             break;
 		}
+        case AST_MATCH: {
+            printf("(match ");
+			print_tree(node->as.match.matcher, level);
+			List *branches = &node->as.match.branches;
+			for (int i = 0; i < branches->length; i++) {
+				MatchBranch branch = LIST_GET(MatchBranch, &node->as.match.branches, i);
+				printf("\n%*c(", level + 2, ' ');
+				print_type_info(branch.type_info);
+				printf(" ");
+				print_tree(branch.identifier, level);
+				printf(" ");
+				print_tree(branch.expression, level);
+				printf(")");
+			}
+			printf(")");
+            break;
+		}
         case AST_NUMBER:
             printf("%f", node->as.number);
             break;
@@ -454,8 +471,39 @@ static AstNode *parse_array() {
 	return parse_logical_or();
 }
 
-static AstNode *parse_expression() {
+static AstNode *parse_match() {
+    if (current_token->type == TOKEN_MATCH) {
+		current_token++;
+		AstNode *node = create_node(AST_MATCH);
+		node->as.match.matcher = parse_array();
+		consume(TOKEN_LEFT_BRACE);
+
+		list_init(&node->as.match.branches, sizeof(MatchBranch));
+
+		while (current_token->type != TOKEN_RIGHT_BRACE) {
+			MatchBranch branch;
+			branch.type_info = parse_type();
+
+			assert(current_token->type == TOKEN_IDENTIFIER);
+			branch.identifier = create_variable();
+			current_token++;
+
+			consume(TOKEN_ARROW);
+
+			branch.expression = parse_expression();
+
+			list_add(&node->as.match.branches, &branch);
+		}
+
+		consume(TOKEN_RIGHT_BRACE);
+		return node;
+	}
+
 	return parse_array();
+}
+
+static AstNode *parse_expression() {
+	return parse_match();
 }
 
 static AstNode *parse_assignment_or_expression_statement() {

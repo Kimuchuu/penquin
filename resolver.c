@@ -202,6 +202,17 @@ static void parse_item_access(AstNode *node) {
 	parse_node(node->as.item_access.indexable);
 }
 
+static void parse_match(AstNode *node) {
+	parse_node(node->as.match.matcher);
+	for (int i = 0; i < node->as.match.branches.length; i++) {
+		MatchBranch branch = LIST_GET(MatchBranch, &node->as.match.branches, i);
+		// TODO: new scope to not clash
+		table_put(current_scope->locals, branch.identifier->as.variable.name, branch.identifier);
+		parse_node(branch.identifier);
+		parse_node(branch.expression);
+	}
+}
+
 static void parse_number(AstNode *node) {}
 
 static void parse_operator(AstNode *node) {
@@ -264,6 +275,9 @@ static void parse_node(AstNode *node) {
 			break;
 		case AST_ITEM_ACCESS:
 			parse_item_access(node);
+			break;
+		case AST_MATCH:
+			parse_match(node);
 			break;
 		case AST_NUMBER:
 			parse_number(node);

@@ -22,6 +22,7 @@ static TokenType prev_token_type;
 
 const char *token_type_to_string(TokenType type) {
     switch (type) {
+        CASE_TOKEN(ARROW);
         CASE_TOKEN(COLON);
         CASE_TOKEN(COMMA);
         CASE_TOKEN(DOT);
@@ -46,6 +47,7 @@ const char *token_type_to_string(TokenType type) {
         CASE_TOKEN(LESS_THAN_OR_EQUAL);
         CASE_TOKEN(LOGICAL_AND);
         CASE_TOKEN(LOGICAL_OR);
+        CASE_TOKEN(MATCH);
         CASE_TOKEN(MINUS);
         CASE_TOKEN(NOT_EQUAL);
         CASE_TOKEN(NUMBER);
@@ -133,6 +135,8 @@ static void scan_token() {
 			token.type = TOKEN_TRUE;
 		} else if (len == 5 && strncmp(token.raw, "false", 5) == 0) {
 			token.type = TOKEN_FALSE;
+		} else if (len == 5 && strncmp(token.raw, "match", 5) == 0) {
+			token.type = TOKEN_MATCH;
 		} else if (len == 5 && strncmp(token.raw, "while", 5) == 0) {
 			token.type = TOKEN_WHILE;
 		} else if (len == 6 && strncmp(token.raw, "extern", 6) == 0) {
@@ -224,7 +228,12 @@ static void scan_token() {
             token.type = TOKEN_PLUS;
             break;
         case '-':
-            token.type = TOKEN_MINUS;
+			if (token.raw[1] == '>') {
+				scanner.current++;
+				token.type = TOKEN_ARROW;
+			} else {
+				token.type = TOKEN_MINUS;
+			}
             break;
         case '*':
             token.type = TOKEN_STAR;

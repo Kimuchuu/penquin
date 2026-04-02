@@ -125,6 +125,21 @@ static void parse_item_access(AstNode *node) {
 	node->type_info = node->as.item_access.indexable->type_info->pointer_to;
 }
 
+static void parse_match(AstNode *node) {
+	parse_node(node->as.match.matcher);
+	assert(String_cmp_cstring(node->as.match.matcher->type_info->value_of, "any") == 0);
+	for (int i = 0; i < node->as.match.branches.length; i++) {
+		MatchBranch branch = LIST_GET(MatchBranch, &node->as.match.branches, i);
+		parse_node(branch.identifier);
+		parse_node(branch.expression);
+		if (i == 0) {
+			node->type_info = branch.expression->type_info;
+		} else {
+			// TODO: assert the same type is returned each branch
+		}
+	}
+}
+
 static void parse_number(AstNode *node) {
 	node->type_info = value_of("s4");
 }
@@ -214,6 +229,9 @@ static void parse_node(AstNode *node) {
 			break;
 		case AST_ITEM_ACCESS:
 			parse_item_access(node);
+			break;
+		case AST_MATCH:
+			parse_match(node);
 			break;
 		case AST_NUMBER:
 			parse_number(node);

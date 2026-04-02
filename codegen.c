@@ -57,6 +57,29 @@ static LLVMValueRef handle_rvalue(LLVMValueRef rvalue) {
 	return rvalue;
 }
 
+// TODO: attach actual id to types
+static int get_type_id(TypeInfo *type_info) {
+	if (type_info->type == TYPE_VALUE) {
+		if (String_cmp_cstring(type_info->value_of, "s1") == 0) {
+			return 0;
+		} else if (String_cmp_cstring(type_info->value_of, "s2") == 0) {
+			return 1;
+		} else if (String_cmp_cstring(type_info->value_of, "s4") == 0) {
+			return 2;
+		} else if (String_cmp_cstring(type_info->value_of, "s8") == 0) {
+			return 3;
+		} else if (String_cmp_cstring(type_info->value_of, "bool") == 0) {
+			return 4;
+		}
+		assert(false);
+	} else if (type_info->type == TYPE_POINTER) {
+		return 100 + get_type_id(type_info->pointer_to);
+	} else if (type_info->type == TYPE_ARRAY) {
+		return 1000 + get_type_id(type_info->array.of);
+	}
+	assert(false);
+}
+
 static LLVMTypeRef parse_type(TypeInfo *type_info) {
 	switch (type_info->type) {
 		case TYPE_VALUE:
@@ -216,27 +239,38 @@ static LLVMValueRef parse_function_call(AstNode *node) {
 
 	LLVMValueRef args[n_arguments];
 	for (int i = 0; i < n_arguments; i++) {
+		AstNode *parameter = LIST_GET(AstNode *, &parameters, i);
 		if (rest && i == n_arguments - 1) {
 			int rest_length = node->as.call.arguments.length - i;
-			AstNode *item_node = LIST_GET(AstNode *, &node->as.call.arguments, i);
-			LLVMValueRef item = handle_rvalue(parse_node(item_node));
-			LLVMTypeRef item_type = parse_type(item_node->type_info);
+			TypeInfo *item_type_info = parameter->type_info->pointer_to;
+			bool any_type = String_cmp_cstring(item_type_info->value_of, "any") == 0;
+			LLVMTypeRef item_type = parse_type(item_type_info);
 			LLVMTypeRef array_type = LLVMArrayType2(item_type, rest_length);
 			LLVMValueRef alloca = LLVMBuildAlloca(builder, array_type, "");
 
 			LLVMValueRef indices[2];
 			indices[0] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0);
-			indices[1] = indices[0];
-			LLVMValueRef item_ptr = LLVMBuildGEP2(builder, array_type, alloca, indices, 2, "");
-			LLVMBuildStore(builder, item, item_ptr);
 
-			for (int j = i + 1; j < node->as.call.arguments.length; j++) {
-				item_node = LIST_GET(AstNode *, &node->as.call.arguments, j);
-				item = handle_rvalue(parse_node(item_node));
-
+			for (int j = i; j < node->as.call.arguments.length; j++) {
+				AstNode *item_node = LIST_GET(AstNode *, &node->as.call.arguments, j);
+				LLVMValueRef item = handle_rvalue(parse_node(item_node));
 				indices[1] = LLVMConstInt(LLVMInt32TypeInContext(context), j - 1, 0);
 				LLVMValueRef item_ptr = LLVMBuildGEP2(builder, array_type, alloca, indices, 2, "");
-				LLVMBuildStore(builder, item, item_ptr);
+				if (any_type) {
+					LLVMValueRef type_ptr = LLVMBuildStructGEP2(builder, item_type, item_ptr, 0, "any.type");
+					LLVMValueRef value_type = LLVMConstInt(LLVMInt32TypeInContext(context),
+														   get_type_id(item_node->type_info),
+														   0);
+					LLVMBuildStore(builder, value_type, type_ptr);
+
+					LLVMValueRef value_ref = LLVMBuildAlloca(builder, parse_type(item_node->type_info), "any.value_ref");
+					LLVMBuildStore(builder, item, value_ref);
+
+					LLVMValueRef ptr_ptr = LLVMBuildStructGEP2(builder, item_type, item_ptr, 1, "any.value");
+					LLVMBuildStore(builder, value_ref, ptr_ptr);
+				} else {
+					LLVMBuildStore(builder, item, item_ptr);
+				}
 			}
 
 			args[i] = alloca;
@@ -453,6 +487,50 @@ static LLVMValueRef parse_item_access(AstNode *node) {
 	return LLVMBuildLoad2(builder, item_type, item_pointer, "");
 }
 
+static LLVMValueRef parse_match(AstNode *node) {
+	LLVMBasicBlockRef start_block = LLVMAppendBasicBlockInContext(context, current_function, "match.start");
+	LLVMBasicBlockRef end_block = LLVMAppendBasicBlockInContext(context, current_function, "match.end");
+
+	LLVMBuildBr(builder, start_block);
+	LLVMPositionBuilderAtEnd(builder, start_block);
+
+	LLVMValueRef any_value = parse_node(node->as.match.matcher);
+
+	LLVMValueRef type_value = LLVMBuildExtractValue(builder, any_value, 0, "match.type.value");
+	LLVMValueRef value_ptr = LLVMBuildExtractValue(builder, any_value, 1, "match.value.ptr");
+
+	LLVMBasicBlockRef next_block = end_block;
+	for (int i = node->as.match.branches.length - 1; i >= 0; i--) {
+		LLVMPositionBuilderAtEnd(builder, next_block);
+
+		LLVMBasicBlockRef option_block = LLVMAppendBasicBlockInContext(context, current_function, "match.option");
+		LLVMBasicBlockRef result_block = LLVMAppendBasicBlockInContext(context, current_function, "match.result");
+
+		LLVMPositionBuilderAtEnd(builder, option_block);
+		MatchBranch branch = LIST_GET(MatchBranch, &node->as.match.branches, i);
+		LLVMValueRef branch_type_id = LLVMConstInt(LLVMInt32TypeInContext(context), get_type_id(branch.type_info), 0);
+		LLVMValueRef condition = LLVMBuildICmp(builder, LLVMIntEQ, type_value, branch_type_id, "");
+		LLVMBuildCondBr(builder, condition, result_block, next_block);
+
+		LLVMPositionBuilderAtEnd(builder, result_block);
+		char *name = String_to_cstring(branch.identifier->as.variable.name);
+		LLVMTypeRef branch_type = parse_type(branch.type_info);
+		branch.identifier->backend_ref = LLVMBuildAlloca(builder, branch_type, name);
+		LLVMValueRef value_value = LLVMBuildLoad2(builder, branch_type, value_ptr, "match.value.value");
+		LLVMBuildStore(builder, value_value, branch.identifier->backend_ref);
+		parse_node(branch.expression);
+		LLVMBuildBr(builder, end_block);
+
+		next_block = option_block;
+	}
+
+	LLVMPositionBuilderAtEnd(builder, start_block);
+	LLVMBuildBr(builder, next_block);
+
+	LLVMPositionBuilderAtEnd(builder, end_block);
+	return NULL;
+}
+
 static LLVMValueRef parse_file_node(AstNode *node) {
 	List *nodes = &node->as.file.nodes;
     for (int i = 0; i < nodes->length; i++) {
@@ -498,6 +576,8 @@ static LLVMValueRef parse_node(AstNode *node) {
 			return parse_array(node);
 		case AST_ITEM_ACCESS:
 			return parse_item_access(node);
+		case AST_MATCH:
+			return parse_match(node);
 		default:
 			report_invalid_node("Unhandled node types");
     }
@@ -520,6 +600,13 @@ void compiler_initialize(Table *modules_) {
 	string_elements[1] = LLVMPointerType(table_get(&types, STRING("s1")), 0);
 	LLVMStructSetBody(string_type, string_elements, 2, false);
 	table_put(&types, STRING("string"), string_type);
+
+	LLVMTypeRef	any_type = LLVMStructCreateNamed(context, "any");
+	LLVMTypeRef any_elements[2];
+	any_elements[0] = table_get(&types, STRING("s4"));
+	any_elements[1] = LLVMPointerTypeInContext(context, 0);
+	LLVMStructSetBody(any_type, any_elements, 2, false);
+	table_put(&types, STRING("any"), any_type);
 }
 
 LLVMModuleRef build_module(AstNode *file_node, char *dir, char *name, bool entry) {
