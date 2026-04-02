@@ -448,7 +448,7 @@ static LLVMValueRef parse_item_access(AstNode *node) {
 		item_type = parse_type(type_info->pointer_to);
 
 		LLVMValueRef indices[1] = { index };
-		item_pointer = LLVMBuildGEP2(builder, allocated_type, indexable, indices, 1, "");
+		item_pointer = LLVMBuildGEP2(builder, item_type, indexable, indices, 1, "");
 	}
 	return LLVMBuildLoad2(builder, item_type, item_pointer, "");
 }
