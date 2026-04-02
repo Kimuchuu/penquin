@@ -234,7 +234,7 @@ static LLVMValueRef parse_function_call(AstNode *node) {
 				item_node = LIST_GET(AstNode *, &node->as.call.arguments, j);
 				item = handle_rvalue(parse_node(item_node));
 
-				indices[1] = LLVMConstInt(LLVMInt32TypeInContext(context), 0, j);
+				indices[1] = LLVMConstInt(LLVMInt32TypeInContext(context), j - 1, 0);
 				LLVMValueRef item_ptr = LLVMBuildGEP2(builder, array_type, alloca, indices, 2, "");
 				LLVMBuildStore(builder, item, item_ptr);
 			}
